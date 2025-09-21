@@ -28,7 +28,7 @@
 - Markdown file processing pipeline (6 tools)
 - Enhanced agent management (4 tools)  
 - MCP Resources (8 read-only endpoints)
-- MCP Prompts (7 prompts + aliases)
+- MCP Prompts (9 prompts + aliases)
 - Enhanced deduplication & error handling
 - File metadata tracking
 
@@ -43,15 +43,23 @@
 
 #### What to Implement:
 1. **Create `src/markdown_processor.py`**
-   - Markdown file discovery and scanning
-   - Content analysis and categorization 
+   - Markdown file discovery and scanning with configurable directory paths
+   - Content analysis and categorization with memory type suggestions
    - Content optimization for storage
    - Header-aware chunking (900 tokens, 200 overlap)
+   - **Memory Type Suggestion System:**
+     - Analyzes content structure, keywords, and context
+     - Suggests `global` for documentation, standards, general knowledge
+     - Suggests `learned` for patterns, insights, best practices, lessons
+     - Suggests `agent` for task-specific, personal notes, agent context
+     - Provides reasoning for suggestions
+     - Always allows user override with confirmation
 
 2. **Add Tools to `src/tool_handlers.py`:**
-   - `scan_workspace_markdown(directory="./")` 
-   - `analyze_markdown_content(content)`
-   - `optimize_content_for_storage(content, memory_type)`
+   - `scan_workspace_markdown(directory="./", recursive=true)` 
+   - `analyze_markdown_content(content, suggest_memory_type=true)`
+   - `optimize_content_for_storage(content, memory_type, suggested_type=null)`
+   - `process_markdown_directory(directory, memory_type=null, auto_suggest=true)`
    - Update tool schemas in `src/mcp_server.py`
 
 3. **Configuration Updates:**
@@ -59,17 +67,24 @@
    - Add markdown processing settings and constants
 
 #### Testing Requirements:
-- Unit tests for each markdown processing function
-- Test with sample markdown files from `sample_data/`
+- Unit tests for each markdown processing function with various directory paths
+- Test with sample markdown files from `sample_data/` and custom directories
+- Test recursive vs non-recursive directory scanning
 - Verify chunking preserves headers and code blocks
-- Test file discovery with nested directories
-- Validate content analysis recommendations
+- Test file discovery with nested directories and symbolic links
+- Validate content analysis provides accurate memory type suggestions
+- Test user override of memory type suggestions
+- Test batch directory processing with mixed content types
+- Verify error handling for inaccessible directories and files
 
 #### Success Criteria:
-- [ ] Can scan workspace and list all `.md` files
-- [ ] Correctly analyzes markdown content and suggests memory layer
+- [ ] Can scan any specified directory (not just current workspace) for `.md` files
+- [ ] Supports recursive and non-recursive directory scanning
+- [ ] Correctly analyzes markdown content and suggests appropriate memory layer
+- [ ] Allows user override of suggested memory type with clear reasoning
 - [ ] Optimizes content while preserving structure
-- [ ] All tests pass
+- [ ] Can process entire directories with batch memory type assignment
+- [ ] All tests pass with various directory structures
 - [ ] No breaking changes to existing functionality
 
 #### Branch Commands:
@@ -131,8 +146,9 @@ git push origin feature/markdown-processing-foundation
    - Add provenance tracking
 
 2. **Complete Ingestion Tools in `src/tool_handlers.py`:**
-   - `process_markdown_file(path, memory_type, agent_id?)`
-   - `batch_process_markdown_files(assignments)`
+   - `process_markdown_file(path, memory_type=null, auto_suggest=true, agent_id=null)`
+   - `batch_process_markdown_files(file_assignments, default_memory_type=null)`
+   - `batch_process_directory(directory, memory_type=null, recursive=true, agent_id=null)`
    - Update tool schemas in `src/mcp_server.py`
 
 3. **Integration:**
@@ -143,10 +159,13 @@ git push origin feature/markdown-processing-foundation
 
 #### Testing Requirements:
 - Test complete pipeline: scan → analyze → optimize → dedupe → embed → store
-- Test batch processing with multiple files
-- Test file metadata tracking
-- Test error recovery (corrupt files, network issues)
-- Integration test with sample repository
+- Test batch processing with multiple files and directories
+- Test directory-based batch processing with memory type suggestions
+- Test user memory type overrides vs suggestions
+- Test file metadata tracking with directory context
+- Test error recovery (corrupt files, network issues, permission errors)
+- Integration test with sample repository and custom directory structures
+- Test mixed content types within single directory processing
 
 #### Success Criteria:
 - [ ] Complete markdown file can be processed end-to-end
@@ -208,8 +227,8 @@ git push origin feature/markdown-processing-foundation
    - `global_memory_catalog` — Indexed global memory with tags
    - `learned_patterns_index` — Categorized learned memory
    - `agent_memory_summary/{agent_id}` — Per-agent memory digest
-   - `file_processing_log` — Ingestion history and status
-   - `workspace_markdown_files` — Discovered files with analysis
+   - `file_processing_log` — Ingestion history and status with directory tracking
+   - `workspace_markdown_files/{directory}` — Discovered files with analysis by directory
    - `memory_collection_health` — Qdrant statistics and health
 
 3. **Add Pagination Support:**
@@ -256,8 +275,10 @@ git push origin feature/markdown-processing-foundation
    - `context_preservation_strategy`
    - `memory_query_optimization`
    - `markdown_optimization_rules`
-   - `memory_type_selection_criteria`
+   - `memory_type_selection_criteria` (enhanced with suggestion system)
    - `duplicate_detection_strategy`
+   - `directory_processing_best_practices` (new)
+   - `memory_type_suggestion_guidelines` (new)
 
 #### Testing Requirements:
 - Test prompt listing via MCP protocol
