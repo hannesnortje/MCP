@@ -12,16 +12,7 @@
 ## Implementation Overview
 
 ### What We Have ✅
-- **Modular Archi| Step | Status | Branch | Notes |
-|------|--------|--------|-------|
-| 1. Markdown Foundation | 🟡 Basic Processor Ready | `feature/markdown-processing-foundation` | Basic processor ✅ + MCP integration & analysis needed |
-| 2. Deduplication | ⚪ Waiting | `feature/cosine-similarity-deduplication` | Depends on Step 1 completion |  
-| 3. Ingestion Pipeline | ⚪ Waiting | `feature/markdown-ingestion-pipeline` | Depends on Steps 1-2 |
-| 4. Agent Management | ⚪ Waiting | `feature/enhanced-agent-management` | Can start after Step 1 |
-| 5. MCP Resources | ⚪ Waiting | `feature/mcp-resources` | Depends on Steps 1-4 |
-| 6. MCP Prompts | ⚪ Waiting | `feature/mcp-prompts` | Can start after Step 4 |
-| 7. Production Features | ⚪ Waiting | `feature/production-features` | Final polish |
-| 8. Final Integration | ⚪ Waiting | `feature/final-integration` | Quality assurance | Refactored from 434-line monolith to 5 focused modules
+- **Modular Architecture**: Refactored from 434-line monolith to 5 focused modules
 - **Entry Point** (`memory_server.py` - 31 lines): Clean main entry point
 - **Server Configuration** (`src/server_config.py` - 70 lines): Centralized config & logging
 - **Qdrant Manager** (`src/qdrant_manager.py` - 183 lines): Docker lifecycle management
@@ -36,9 +27,10 @@
 
 ### What We Need to Add 🔧
 - **Complete Markdown Processing Pipeline** (MCP tool integration + AI-enhanced analysis)
+- **Policy Memory System** (Governance, compliance, and rule enforcement)
 - Enhanced agent management (4 tools)  
-- MCP Resources (8 read-only endpoints)
-- MCP Prompts (9 prompts + aliases)
+- MCP Resources (10 read-only endpoints including policy)
+- MCP Prompts (12 prompts + aliases including policy)
 - Enhanced cosine similarity deduplication
 - File metadata tracking with processing insights
 - **Memory type analysis and content optimization** for database storage
@@ -64,7 +56,7 @@ The markdown processor serves as a **Cursor-AI-friendly foundation** that levera
 This approach ensures the system benefits from AI intelligence while remaining independent of external API dependencies and leveraging the AI tool users already have available in their development environment.
 
 #### What to Implement:
-1. **Create `src/markdown_processor.py`**
+1. **Enhance `src/markdown_processor.py`**
    - Markdown file discovery and scanning with configurable directory paths
    - **Cursor-AI-Driven Content Analysis and Optimization:**
      - Leverage Cursor's AI to intelligently analyze markdown structure and meaning
@@ -81,12 +73,22 @@ This approach ensures the system benefits from AI intelligence while remaining i
      - AI provides intelligent reasoning for memory type recommendations
      - Cursor AI can enhance and refine suggestions based on content context
      - Always allows user override with AI-generated explanations
+   - **Policy Markdown Processing (NEW):**
+     - Policy directory scanning (`./policy/` by default)
+     - Rule ID extraction from list items (`[RULE-ID]` format)
+     - Policy section parsing (Principles, Forbidden Actions, Required Sections)
+     - Rule ID uniqueness validation within policy versions
+     - Policy versioning and hashing system preparation
 
 2. **Add Tools to `src/tool_handlers.py`:**
    - `scan_workspace_markdown(directory="./", recursive=true)` 
    - `analyze_markdown_content(content, suggest_memory_type=true, ai_enhance=true)`
    - `optimize_content_for_storage(content, memory_type, ai_optimization=true, suggested_type=null)`
    - `process_markdown_directory(directory, memory_type=null, auto_suggest=true, ai_enhance=true)`
+   - **Policy Processing Tools (NEW):**
+     - `scan_policy_markdown(directory="./policy")` — Discover policy files with rule validation
+     - `extract_policy_rules(content)` — Parse rule IDs and sections from policy markdown
+     - `validate_policy_rules(rules, policy_version)` — Check uniqueness and format compliance
    - **AI Integration Points:**
      - Each tool leverages Cursor AI for intelligent content processing
      - AI-driven content optimization before database storage
@@ -101,6 +103,11 @@ This approach ensures the system benefits from AI intelligence while remaining i
      - Settings for AI-driven content optimization levels
      - Configuration for AI analysis depth and focus areas
      - Toggles for different AI enhancement features
+   - **Policy Processing Configuration (NEW):**
+     - Policy directory path (`./policy/` default)
+     - Rule ID format validation patterns
+     - Policy validation strictness levels
+     - Policy file discovery settings
 
 #### Testing Requirements:
 - Unit tests for each markdown processing function with various directory paths
@@ -293,7 +300,7 @@ The current `src/markdown_processor.py` provides a solid foundation with:
    - Handle `resources/read` MCP method
    - Create new resource handler class in `src/resource_handlers.py`
 
-2. **Implement 8 Resources:**
+2. **Implement 10 Resources:**
    - `agent_registry` — List of all agents with roles and memory layers
    - `memory_access_matrix` — Agent-to-memory access mappings  
    - `global_memory_catalog` — Indexed global memory with tags
@@ -302,6 +309,9 @@ The current `src/markdown_processor.py` provides a solid foundation with:
    - `file_processing_log` — Ingestion history and status with directory tracking
    - `workspace_markdown_files/{directory}` — Discovered files with analysis by directory
    - `memory_collection_health` — Qdrant statistics and health
+   - **Policy Resources (NEW):**
+     - `policy_rulebook` — Canonical JSON policy snapshot with version/hash
+     - `policy_violations_log` — Policy violation tracking and audit trail
 
 3. **Add Pagination Support:**
    - Handle large datasets with pagination
@@ -315,11 +325,12 @@ The current `src/markdown_processor.py` provides a solid foundation with:
 - Test resources update when system state changes
 
 #### Success Criteria:
-- [ ] All 8 resources implemented and accessible
+- [ ] All 10 resources implemented and accessible (including policy resources)
 - [ ] Resources return live, accurate data
 - [ ] Pagination works for large datasets
 - [ ] MCP protocol compliance for resources
 - [ ] Resources update when underlying data changes
+- [ ] Policy resources reflect current policy version and violations
 
 ---
 
@@ -335,8 +346,9 @@ The current `src/markdown_processor.py` provides a solid foundation with:
    - Create new prompt handler class in `src/prompt_handlers.py`
 
 2. **Implement Core Prompt:**
-   - `agent_startup` with arguments (agent_id, agent_role, memory_layers)
+   - `agent_startup` with arguments (agent_id, agent_role, memory_layers, policy_version, policy_hash)
    - Input validation and error handling
+   - Policy binding and compliance requirements
 
 3. **Implement Alias Prompts:**
    - `development_agent_startup` 
@@ -351,6 +363,10 @@ The current `src/markdown_processor.py` provides a solid foundation with:
    - `duplicate_detection_strategy`
    - `directory_processing_best_practices` (new)
    - `memory_type_suggestion_guidelines` (new)
+   - **Policy Prompts (NEW):**
+     - `final_checklist` — Pre-finalization policy compliance checks
+     - `policy_compliance_guide` — How to follow policy rulebook
+     - `policy_violation_recovery` — What to do when policy conflicts arise
 
 #### Testing Requirements:
 - Test prompt listing via MCP protocol
@@ -448,6 +464,102 @@ The current `src/markdown_processor.py` provides a solid foundation with:
 
 ---
 
+### **STEP 9: Policy Memory System**
+**Branch:** `feature/policy-memory-system`
+**Estimated Time:** 2-3 days
+**Priority:** HIGH (Governance & Compliance)
+
+#### Policy-as-Memory Philosophy:
+The policy system transforms governance documents into enforceable, semantically searchable memory that agents must comply with. Unlike traditional rule engines, this system leverages the same vector search and AI capabilities used for general memory, making policies both discoverable and contextually relevant.
+
+#### What to Implement:
+1. **Create `policy_memory` Qdrant Collection:**
+   - Schema: `rule_id`, `policy_version`, `policy_hash`, `title`, `section`, `source_path`, `chunk_index`, `text`, `severity`, `active`
+   - Embedding configuration: Same as other collections (768d, cosine)
+   - Indexing for fast rule lookup and semantic search
+
+2. **Add Policy Tools to `src/tool_handlers.py`:**
+   - `build_policy_from_markdown(directory="./policy", policy_version, activate=true)`
+   - `get_policy_rulebook(version="latest")` — Return canonical JSON policy
+   - `validate_json_against_schema(schema_name, candidate_json)` — Enforce required sections
+   - `log_policy_violation(agent_id, rule_id, context)` — Track compliance issues
+   - Update tool schemas in `src/mcp_server.py`
+
+3. **Create Policy Processing Pipeline:**
+   - **Policy File Discovery:** Scan `./policy/` directory for `.md` files
+   - **Rule Extraction:** Parse `[RULE-ID]` format from list items
+   - **Section Organization:** Group by headers (Principles, Forbidden Actions, Required Sections)
+   - **Validation Engine:** Check rule ID uniqueness, format compliance
+   - **Canonicalization:** Create deterministic JSON with SHA-256 hash
+   - **Version Management:** Handle policy updates with hash verification
+
+4. **Add Policy Resources:**
+   - Enhanced `policy_rulebook` resource with full canonical JSON
+   - `policy_violations_log` resource for compliance tracking
+   - Integration with existing resource handler
+
+5. **Agent Policy Binding:**
+   - Modify agent startup to require policy version/hash
+   - Policy compliance validation in all agent operations  
+   - Automatic policy rule retrieval for context
+
+#### Policy File Structure Requirements:
+```
+/policy/
+├── 01-principles.md          # Core principles [P-001], [P-002]...
+├── 02-forbidden-actions.md   # Prohibited actions [F-101], [F-102]...  
+├── 03-required-sections.md   # Schema requirements [R-201], [R-202]...
+└── 04-style-guide.md        # Output formatting [S-301], [S-302]...
+```
+
+#### Testing Requirements:
+- **Policy Parsing Tests:**
+  - Valid policy files with proper `[RULE-ID]` format
+  - Invalid files (duplicate IDs, missing IDs, malformed)
+  - Policy directory scanning and file discovery
+- **Policy Validation Tests:**  
+  - Rule ID uniqueness enforcement
+  - Policy versioning and hash consistency
+  - Schema validation against required sections
+- **Agent Compliance Tests:**
+  - Agent startup with policy binding
+  - Policy rule retrieval during operations
+  - Violation logging and recovery
+- **Integration Tests:**
+  - Policy updates with hash verification
+  - Multi-agent policy compliance
+  - Performance with large policy sets
+
+#### Success Criteria:
+- [ ] Policy markdown files parsed correctly with rule ID extraction
+- [ ] Policy versioning system with SHA-256 hash validation
+- [ ] `policy_memory` collection stores searchable policy rules
+- [ ] Canonical JSON policy resource with version/hash tracking
+- [ ] Agent startup requires and validates policy binding
+- [ ] Schema validation enforces required sections per policy
+- [ ] Policy violations logged with context and rule references
+- [ ] Policy updates trigger hash changes and require agent rebinding
+- [ ] Semantic policy search works alongside rule lookup
+- [ ] All policy integration tests pass
+- [ ] No performance degradation with policy enforcement
+
+#### Branch Commands:
+```bash
+git checkout -b feature/policy-memory-system
+# Implement policy collection and tools
+git add .
+git commit -m "feat: add policy memory collection and basic tools"
+# Implement policy processing pipeline
+git add .
+git commit -m "feat: add policy markdown processing and validation"
+# Implement agent policy binding
+git add .
+git commit -m "feat: integrate policy compliance into agent operations"
+git push origin feature/policy-memory-system
+```
+
+---
+
 ## Branch Management Workflow
 
 ### For Each Step:
@@ -502,6 +614,7 @@ The current `src/markdown_processor.py` provides a solid foundation with:
 - [ ] Complete MCP protocol compliance (Tools, Resources, Prompts)
 - [ ] Robust markdown ingestion pipeline
 - [ ] Multi-agent memory management
+- [ ] **Policy memory system with governance and compliance**
 - [ ] Production-ready error handling
 - [ ] Performance requirements met
 - [ ] Comprehensive test coverage
@@ -526,7 +639,7 @@ If any step causes issues:
 
 ## Current Status Tracking
 
-**Overall Progress:** 0/8 steps completed + ✅ Modular Architecture Refactoring Complete
+**Overall Progress:** 0/9 steps completed + ✅ Modular Architecture Refactoring Complete
 
 > **🎉 Recent Completion:** Successfully refactored monolithic 434-line `memory_server.py` into 5 focused modules (838 total lines) with automatic Qdrant startup, clean separation of concerns, and improved maintainability.
 
@@ -540,11 +653,12 @@ If any step causes issues:
 | 6. MCP Prompts | ⚪ Waiting | `feature/mcp-prompts` | Can start after Step 4 |
 | 7. Production Features | ⚪ Waiting | `feature/production-features` | Final polish |
 | 8. Final Integration | ⚪ Waiting | `feature/final-integration` | Quality assurance |
+| 9. Policy Memory System | ⚪ Waiting | `feature/policy-memory-system` | Governance & compliance |
 
 **Legend:** 🟢 Complete | 🟡 In Progress | 🔴 Blocked | ⚪ Not Started
 
 ---
 
-*Last Updated: September 21, 2025*
-*Recent Achievement: ✅ Modular Architecture + Basic Markdown Processor Complete*
-*Next Step: Complete Step 1 - Add memory type analysis, MCP integration, and AI enhancement hooks*
+*Last Updated: September 22, 2025*
+*Recent Achievement: ✅ Modular Architecture + Basic Markdown Processor Complete + Policy System Integration*
+*Next Step: Complete Step 1 - Add memory type analysis, MCP integration, AI enhancement hooks, and policy processing*

@@ -23,6 +23,7 @@
 - `learned_memory` — Lessons, postmortems, anti-patterns for avoiding mistakes.
 - `agent_<id>` — Private agent memory for context and actions.
 - `file_metadata` — Provenance (path, hash, chunk IDs, memory target, timestamps).
+- `policy_memory` — Semantic policy rule storage with version tracking for governance.
 
 **Vector config (defaults):**
 - Embeddings: `intfloat/e5-base-v2` (768 dimensions, cosine distance).
@@ -48,6 +49,12 @@
 - `query_memory_for_agent(agent_id, query, memory_layers)` — Search across allowed layers, return ranked results.
 - `store_agent_action(agent_id, action, context, outcome, learn?)` — Log action; optionally upsert to `learned_memory`.
 
+### Policy & Governance
+- `build_policy_from_markdown(directory, policy_version, activate)` — Parse policy files, validate rules, create canonical JSON.
+- `get_policy_rulebook(version?)` — Retrieve canonical policy JSON with hash verification.
+- `validate_json_against_schema(schema_name, candidate_json)` — Enforce required sections per policy.
+- `log_policy_violation(agent_id, rule_id, context)` — Track policy compliance issues.
+
 **New in v0.4:**
 - All tools include error handling (e.g., Qdrant connection errors, invalid inputs).
 - Tools return JSON with `status`, `diagnostics`, `decisions` (e.g., `"deduped": true`), and `ids` (Qdrant points).
@@ -65,6 +72,8 @@ Read-only snapshots for agents/IDE:
 - `file_processing_log` — Ingestion history (file, status, chunk IDs).
 - `workspace_markdown_files` — Discovered `.md` files with analysis.
 - `memory_collection_health` — Qdrant stats (point count, duplicates, shard status).
+- `policy_rulebook` — Canonical JSON policy with version/hash for compliance.
+- `policy_violations_log` — Policy violation tracking and audit trail.
 
 **New in v0.4:** Resources support pagination for large datasets; health includes shard diagnostics.
 
@@ -76,9 +85,11 @@ Read-only snapshots for agents/IDE:
 **`agent_startup`**
 - **Arguments:**
   - `agent_id` (string, required) — Unique identifier.
-  - `agent_role` (string, required) — Purpose (e.g., "React developer", "QA tester").
+  - `agent_role` (string, required) — Role description.
   - `memory_layers` (array, default `["global"]`) — Layers to access (`global`, `learned`, `agent_specific`).
-- **Behavior:** Initialize agent, set permissions, preload specified memory layers.
+  - `policy_version` (string, required) — Policy version to bind agent to.
+  - `policy_hash` (string, required) — SHA-256 hash of policy for verification.
+- **Behavior:** Initialize agent, set permissions, preload specified memory layers, bind to policy.
 - **Example:**
   ```json
   {
@@ -185,12 +196,20 @@ dedupe:
 permissions:
   defaults:
     global: read
-    learned: conditional # Set via memory_layers in agent_startup
-    agent: read_write
+    learned: read_write
+    agent_specific: read_write
 
 scalability:
   max_points_per_collection: 100000
   shards_per_collection: 2
+
+policy:
+  directory: "./policy"
+  version: "v1.0"
+  fail_on_duplicate_rule_id: true
+  fail_on_missing_rule_id: true
+  compute_hash_from: "canonical_json"
+  activate_on_build: true
 ```
 
 **New in v0.4:** Added `retry_attempts`, `retry_delay` for embeddings, and `scalability` section for large datasets.
