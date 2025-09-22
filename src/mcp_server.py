@@ -11,6 +11,7 @@ from typing import Dict, Any, List, Optional
 from .server_config import get_logger, MCP_PROTOCOL_VERSION, MCP_SERVER_INFO
 from .qdrant_manager import ensure_qdrant_running
 from .tool_handlers import ToolHandlers
+from .resource_handlers import ResourceHandlers
 
 logger = get_logger("mcp-server")
 
@@ -49,6 +50,9 @@ class MemoryMCPServer:
         
         # Initialize tool handlers
         self.tool_handlers = ToolHandlers(self.memory_manager)
+        
+        # Initialize resource handlers
+        self.resource_handlers = ResourceHandlers(self.memory_manager)
         
         logger.info("Memory MCP Server initialized")
 
@@ -726,6 +730,46 @@ class MemoryMCPServer:
         """Handle a tool call and return the result."""
         return await self.tool_handlers.handle_tool_call(tool_name, arguments)
 
+    def get_available_resources(self) -> List[Dict[str, Any]]:
+        """Get list of available resources."""
+        if not self.memory_manager:
+            return []
+        return self.resource_handlers.list_resources()
+
+    async def handle_resource_read(
+        self, uri: str, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Handle a resource read request."""
+        try:
+            # Read the resource with all parameters
+            result = await self.resource_handlers.read_resource(uri, **params)
+            
+            if result.get('status') == 'error':
+                return {
+                    "error": {
+                        "code": -32603,
+                        "message": result.get('error', 'Unknown error')
+                    }
+                }
+            
+            # Format successful response
+            return {
+                "contents": [{
+                    "uri": uri,
+                    "mimeType": "application/json",
+                    "text": json.dumps(result.get('data', {}), indent=2)
+                }]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error reading resource {uri}: {e}")
+            return {
+                "error": {
+                    "code": -32603,
+                    "message": f"Failed to read resource: {str(e)}"
+                }
+            }
+
 
 def send_response(
     request_id: Optional[str],
@@ -766,6 +810,10 @@ async def run_mcp_server():
         "capabilities": {
             "tools": {
                 "listChanged": False
+            },
+            "resources": {
+                "subscribe": False,
+                "listChanged": False
             }
         },
         "serverInfo": MCP_SERVER_INFO
@@ -788,6 +836,26 @@ async def run_mcp_server():
             elif method == "tools/list":
                 tools_response = {"tools": server.get_available_tools()}
                 send_response(request_id, tools_response)
+                
+            elif method == "resources/list":
+                resources = server.get_available_resources()
+                resources_response = {"resources": resources}
+                send_response(request_id, resources_response)
+                
+            elif method == "resources/read":
+                uri = data.get("params", {}).get("uri")
+                if not uri:
+                    error_response = {
+                        "error": {
+                            "code": -32602,
+                            "message": "URI parameter required"
+                        }
+                    }
+                    send_response(request_id, error_response)
+                else:
+                    params = data.get("params", {})
+                    result = await server.handle_resource_read(uri, params)
+                    send_response(request_id, result)
                 
             elif method == "tools/call":
                 tool_name = data.get("params", {}).get("name")
