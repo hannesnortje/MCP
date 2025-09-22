@@ -1480,6 +1480,7 @@ class ToolHandlers:
         """Store policy entries in Qdrant."""
         try:
             from .config import Config
+            import uuid
             
             success_count = 0
             warnings = []
@@ -1488,9 +1489,12 @@ class ToolHandlers:
                 # Create vector embedding for the rule text
                 embedding = self.memory_manager.embedding_model.encode(entry["text"])
                 
+                # Generate UUID for Qdrant point ID
+                point_id = str(uuid.uuid4())
+                
                 # Create point for storage
                 point = {
-                    "id": f"policy_{entry['rule_id']}_{entry['policy_version']}",
+                    "id": point_id,
                     "vector": embedding.tolist(),
                     "payload": entry
                 }
@@ -1503,7 +1507,9 @@ class ToolHandlers:
                     )
                     success_count += 1
                 except Exception as e:
-                    warnings.append(f"Failed to store {entry['rule_id']}: {str(e)}")
+                    warnings.append(
+                        f"Failed to store {entry['rule_id']}: {str(e)}"
+                    )
 
             return {
                 "success": success_count > 0,

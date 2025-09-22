@@ -46,7 +46,7 @@ class Config:
 
     # Policy Configuration
     POLICY_DIRECTORY: str = os.getenv("POLICY_DIRECTORY", "./policy")
-    POLICY_RULE_ID_PATTERN: str = r"\[([A-Z]-\d{3})\]"  # [P-001] format
+    POLICY_RULE_ID_PATTERN: str = r"\[([A-Z]-\d+)\]"  # [P-001] format
     POLICY_REQUIRED_SECTIONS: list = [
         "Principles",
         "Forbidden Actions",

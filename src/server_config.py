@@ -389,7 +389,7 @@ LOGGING_FORMAT = config.log_format
 # Qdrant Configuration
 QDRANT_DEFAULT_HOST = config.qdrant.host
 QDRANT_DEFAULT_PORT = config.qdrant.port
-QDRANT_HEALTH_ENDPOINT = f"http://{config.qdrant.host}:{config.qdrant.port}/health"
+QDRANT_HEALTH_ENDPOINT = f"http://{config.qdrant.host}:{config.qdrant.port}/"
 QDRANT_COLLECTIONS_ENDPOINT = f"http://{config.qdrant.host}:{config.qdrant.port}/collections"
 
 # Docker Configuration
