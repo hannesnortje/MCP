@@ -35,10 +35,33 @@ class PolicyProcessor:
             List of policy file paths
         """
         try:
-            policy_dir = Path(directory or Config.POLICY_DIRECTORY)
+            # Handle directory resolution more robustly
+            if directory:
+                policy_dir = Path(directory)
+            else:
+                # Try to find project root from this file's location
+                current_file = Path(__file__)
+                # Go up from src/ to project root
+                project_root = current_file.parent.parent
+                
+                # If Config.POLICY_DIRECTORY is absolute, use it directly
+                config_policy_dir = Path(Config.POLICY_DIRECTORY)
+                if config_policy_dir.is_absolute():
+                    policy_dir = config_policy_dir
+                else:
+                    # Resolve relative to project root
+                    # Use just the directory name (e.g., 'policy')
+                    policy_dir = project_root / config_policy_dir.name
+            
+            # Log the resolved path for debugging
+            logger.info(
+                f"Attempting to find policy files in: {policy_dir.absolute()}"
+            )
             
             if not policy_dir.exists():
-                logger.warning(f"Policy directory not found: {policy_dir}")
+                logger.warning(
+                    f"Policy directory not found: {policy_dir.absolute()}"
+                )
                 return []
 
             policy_files = []
@@ -46,7 +69,10 @@ class PolicyProcessor:
                 if file_path.is_file():
                     policy_files.append(str(file_path))
             
-            logger.info(f"Found {len(policy_files)} policy files in {policy_dir}")
+            logger.info(
+                f"Found {len(policy_files)} policy files in "
+                f"{policy_dir.absolute()}"
+            )
             return sorted(policy_files)
 
         except Exception as e:
