@@ -802,7 +802,7 @@ class MemoryMCPServer:
                 "description": prompt_data.get('name', name),
                 "messages": [
                     {
-                        "role": "user",
+                        "role": "system",
                         "content": {
                             "type": "text",
                             "text": prompt_data.get('content', '')
