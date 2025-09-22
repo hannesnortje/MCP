@@ -12,6 +12,7 @@ Comprehensive prompt handler system providing:
 
 from datetime import datetime
 from typing import Dict, Any, List
+import uuid
 from .server_config import get_logger
 
 logger = get_logger("prompt-handlers")
@@ -51,15 +52,19 @@ class PromptHandlers:
                 "arguments": [
                     {
                         "name": "agent_id",
-                        "description": "Unique identifier for the agent",
-                        "required": True
+                        "description": (
+                            "Unique identifier for the agent "
+                            "(auto-generated if not provided)"
+                        ),
+                        "required": False
                     },
                     {
                         "name": "agent_role",
                         "description": (
-                            "Agent role (developer, analyst, admin)"
+                            "Agent role (developer, analyst, admin) - "
+                            "defaults to 'general'"
                         ),
-                        "required": True
+                        "required": False
                     },
                     {
                         "name": "memory_layers",
@@ -290,6 +295,15 @@ class PromptHandlers:
         memory_layers = arguments.get("memory_layers", "global,learned")
         policy_version = arguments.get("policy_version", "latest")
         policy_hash = arguments.get("policy_hash", "")
+        
+        # Auto-generate agent_id if not provided
+        if not agent_id:
+            # Generate a proper UUID for Qdrant compatibility
+            agent_id = str(uuid.uuid4())
+        
+        # Auto-generate agent_role if not provided
+        if not agent_role:
+            agent_role = "general"
         
         # Parse memory layers
         if isinstance(memory_layers, str):
