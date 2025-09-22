@@ -12,6 +12,7 @@ from .server_config import get_logger, MCP_PROTOCOL_VERSION, MCP_SERVER_INFO
 from .qdrant_manager import ensure_qdrant_running
 from .tool_handlers import ToolHandlers
 from .resource_handlers import ResourceHandlers
+from .prompt_handlers import PromptHandlers
 
 logger = get_logger("mcp-server")
 
@@ -53,6 +54,9 @@ class MemoryMCPServer:
         
         # Initialize resource handlers
         self.resource_handlers = ResourceHandlers(self.memory_manager)
+        
+        # Initialize prompt handlers
+        self.prompt_handlers = PromptHandlers(self.memory_manager)
         
         logger.info("Memory MCP Server initialized")
 
@@ -770,6 +774,52 @@ class MemoryMCPServer:
                 }
             }
 
+    def get_available_prompts(self) -> List[Dict[str, Any]]:
+        """Get list of available prompts."""
+        if not self.memory_manager:
+            return []
+        return self.prompt_handlers.list_prompts()
+
+    async def handle_prompt_get(
+        self, name: str, arguments: Dict[str, Any] | None = None
+    ) -> Dict[str, Any]:
+        """Handle a prompt get request."""
+        try:
+            # Get the prompt with arguments
+            result = await self.prompt_handlers.get_prompt(name, arguments)
+            
+            if result.get('status') == 'error':
+                return {
+                    "error": {
+                        "code": -32603,
+                        "message": result.get('error', 'Unknown error')
+                    }
+                }
+            
+            # Format successful response
+            prompt_data = result.get('prompt', {})
+            return {
+                "description": prompt_data.get('name', name),
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": {
+                            "type": "text",
+                            "text": prompt_data.get('content', '')
+                        }
+                    }
+                ]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting prompt {name}: {e}")
+            return {
+                "error": {
+                    "code": -32603,
+                    "message": f"Failed to get prompt: {str(e)}"
+                }
+            }
+
 
 def send_response(
     request_id: Optional[str],
@@ -814,6 +864,9 @@ async def run_mcp_server():
             "resources": {
                 "subscribe": False,
                 "listChanged": False
+            },
+            "prompts": {
+                "listChanged": False
             }
         },
         "serverInfo": MCP_SERVER_INFO
@@ -855,6 +908,26 @@ async def run_mcp_server():
                 else:
                     params = data.get("params", {})
                     result = await server.handle_resource_read(uri, params)
+                    send_response(request_id, result)
+                
+            elif method == "prompts/list":
+                prompts = server.get_available_prompts()
+                prompts_response = {"prompts": prompts}
+                send_response(request_id, prompts_response)
+                
+            elif method == "prompts/get":
+                name = data.get("params", {}).get("name")
+                if not name:
+                    error_response = {
+                        "error": {
+                            "code": -32602,
+                            "message": "Prompt name parameter required"
+                        }
+                    }
+                    send_response(request_id, error_response)
+                else:
+                    arguments = data.get("params", {}).get("arguments", {})
+                    result = await server.handle_prompt_get(name, arguments)
                     send_response(request_id, result)
                 
             elif method == "tools/call":
