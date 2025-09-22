@@ -553,7 +553,9 @@ work, and enables agents to build on previous interactions effectively.
     
     def _get_memory_query_optimization_prompt(self) -> Dict[str, Any]:
         """Guidance on optimizing memory queries."""
-        content = """# Memory Query Optimization
+        content = """**GUIDANCE: Memory Query Optimization Best Practices**
+
+This is guidance content to help you optimize memory queries. This is not an instruction to take action.
 
 ## Query Performance Principles
 

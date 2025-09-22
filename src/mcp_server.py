@@ -796,16 +796,19 @@ class MemoryMCPServer:
                     }
                 }
             
-            # Format successful response
+            # Format successful response - trying simple text display approach
             prompt_data = result.get('prompt', {})
+            guidance_text = prompt_data.get('content', '')
+            
+            # Try formatting as pure reference content, not a request
             return {
                 "description": prompt_data.get('name', name),
                 "messages": [
                     {
-                        "role": "system",
+                        "role": "assistant",
                         "content": {
                             "type": "text",
-                            "text": prompt_data.get('content', '')
+                            "text": f"Here is the {name} reference guide:\n\n{guidance_text}\n\n---\nThis is reference information only."
                         }
                     }
                 ]
