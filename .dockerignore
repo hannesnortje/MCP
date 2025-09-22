@@ -1,0 +1,84 @@
+# Docker ignore file for MCP Memory Server
+
+# Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation build
+docs/_build/
+
+# Test files
+tests/
+*.log
+
+# Development files
+.env
+.env.local
+.env.development
+.env.test
+
+# Data and logs (these should be mounted as volumes)
+data/
+logs/
+*.db
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Docker files (avoid recursion)
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+
+# Development and testing
+test_*.py
+*_test.py
+conftest.py
+.github/
+.gitattributes
+
+# Poetry lock file (included in image, but don't need in context)
+# poetry.lock
+
+# README and docs (not needed in production container)
+README.md
+IMPLEMENTATION_PLAN.md
+STEP_BY_STEP_IMPLEMENTATION.md
+MEMORY_SERVER_README.md
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
