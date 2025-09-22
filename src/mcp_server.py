@@ -38,8 +38,11 @@ except ImportError as e:
 class MemoryMCPServer:
     """MCP Server focused solely on memory management using Qdrant."""
     
-    def __init__(self):
-        logger.info("Starting Memory MCP Server...")
+    def __init__(self, server_mode="full"):
+        self.server_mode = server_mode
+        logger.info(
+            f"Starting Memory MCP Server in {server_mode.upper()} mode..."
+        )
         
         # Ensure Qdrant is running before initializing memory manager
         if not ensure_qdrant_running():
@@ -58,14 +61,17 @@ class MemoryMCPServer:
         else:
             self.memory_manager = None
         
-        # Initialize tool handlers
+        # Always initialize tools and resources
         self.tool_handlers = ToolHandlers(self.memory_manager)
-        
-        # Initialize resource handlers
         self.resource_handlers = ResourceHandlers(self.memory_manager)
         
-        # Initialize prompt handlers
-        self.prompt_handlers = PromptHandlers(self.memory_manager)
+        # Conditionally initialize prompt handlers based on server mode
+        if server_mode in ["full", "prompts-only"]:
+            self.prompt_handlers = PromptHandlers(self.memory_manager)
+            logger.info("Prompt handlers initialized")
+        else:
+            self.prompt_handlers = None
+            logger.info("Prompt handlers disabled (tools-only mode)")
         
         logger.info("Memory MCP Server initialized")
 
@@ -662,15 +668,19 @@ class MemoryMCPServer:
             {
                 "name": "initialize_new_agent",
                 "description": (
-                    "Initialize a new agent with role and "
-                    "memory layer configuration"
+                    "Initialize a new agent with role, memory layer "
+                    "configuration, and policy loading (enhanced version "
+                    "of agent_startup prompt)"
                 ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "agent_id": {
                             "type": "string",
-                            "description": "Unique identifier for the agent"
+                            "description": (
+                                "Unique identifier for the agent "
+                                "(auto-generated if not provided)"
+                            )
                         },
                         "agent_role": {
                             "type": "string",
@@ -688,9 +698,28 @@ class MemoryMCPServer:
                                 "Memory layers agent can access "
                                 "(default: ['global', 'learned'])"
                             )
+                        },
+                        "policy_version": {
+                            "type": "string",
+                            "description": (
+                                "Policy version to load (default: latest)"
+                            )
+                        },
+                        "policy_hash": {
+                            "type": "string",
+                            "description": (
+                                "Expected policy hash for verification"
+                            )
+                        },
+                        "load_policies": {
+                            "type": "boolean",
+                            "description": (
+                                "Whether to load policies during initialization "
+                                "(default: true)"
+                            )
                         }
                     },
-                    "required": ["agent_id"]
+                    "required": []
                 }
             },
             {
@@ -928,6 +957,116 @@ class MemoryMCPServer:
                     "properties": {},
                     "additionalProperties": False
                 }
+            },
+            {
+                "name": "get_memory_usage_guidance",
+                "description": (
+                    "Get guidance on effective memory usage patterns and best practices"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_context_preservation_guidance",
+                "description": (
+                    "Get guidance on preserving context across sessions"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_query_optimization_guidance",
+                "description": (
+                    "Get guidance on optimizing memory queries and retrieval"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_markdown_optimization_guidance",
+                "description": (
+                    "Get guidance on processing and storing markdown content"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_duplicate_detection_guidance",
+                "description": (
+                    "Get guidance on detecting and handling duplicate content"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_directory_processing_guidance",
+                "description": (
+                    "Get guidance on batch processing directories"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_memory_type_selection_guidance",
+                "description": (
+                    "Get guidance on selecting appropriate memory types"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_memory_type_suggestion_guidance",
+                "description": (
+                    "Get guidance for AI-powered memory type suggestions"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_policy_compliance_guidance",
+                "description": (
+                    "Get guidance for following policy compliance"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+            {
+                "name": "get_policy_violation_recovery_guidance",
+                "description": (
+                    "Get guidance for recovering from policy violations"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
             }
         ]
 
@@ -984,7 +1123,10 @@ class MemoryMCPServer:
 
     def get_available_prompts(self) -> List[Dict[str, Any]]:
         """Get list of available prompts."""
-        if not self.memory_manager:
+        # Return empty list in tools-only mode or if components not available
+        if (self.server_mode == "tools-only" or
+                not self.memory_manager or
+                not self.prompt_handlers):
             return []
         return self.prompt_handlers.list_prompts()
 
@@ -992,6 +1134,15 @@ class MemoryMCPServer:
         self, name: str, arguments: Dict[str, Any] | None = None
     ) -> Dict[str, Any]:
         """Handle a prompt get request."""
+        # Return error in tools-only mode
+        if self.server_mode == "tools-only" or not self.prompt_handlers:
+            return {
+                "error": {
+                    "code": -32601,
+                    "message": "Prompts not available in tools-only mode"
+                }
+            }
+            
         try:
             # Get the prompt with arguments
             result = await self.prompt_handlers.get_prompt(name, arguments)
@@ -1058,28 +1209,32 @@ def send_notification(method: str, params: Dict[str, Any] = None):
     print(json.dumps(notification), flush=True)
 
 
-async def run_mcp_server():
+async def run_mcp_server(server_mode="full"):
     """Main server loop for MCP protocol handling."""
     logger.info("Memory MCP Server ready, waiting for connections...")
     
-    # Create server instance
-    server = MemoryMCPServer()
+    # Create server instance with specified mode
+    server = MemoryMCPServer(server_mode)
+    
+    # Build MCP capabilities based on server mode
+    capabilities = {}
+    
+    # Always include tools (unless prompts-only mode)
+    if server_mode != "prompts-only":
+        capabilities["tools"] = {"listChanged": False}
+    
+    # Always include resources (unless prompts-only mode)
+    if server_mode != "prompts-only":
+        capabilities["resources"] = {"subscribe": False, "listChanged": False}
+    
+    # Include prompts only in full and prompts-only modes
+    if server_mode in ["full", "prompts-only"]:
+        capabilities["prompts"] = {"listChanged": False}
     
     # MCP initialization response
     init_response = {
         "protocolVersion": MCP_PROTOCOL_VERSION,
-        "capabilities": {
-            "tools": {
-                "listChanged": False
-            },
-            "resources": {
-                "subscribe": False,
-                "listChanged": False
-            },
-            "prompts": {
-                "listChanged": False
-            }
-        },
+        "capabilities": capabilities,
         "serverInfo": MCP_SERVER_INFO
     }
     

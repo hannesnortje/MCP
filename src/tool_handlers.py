@@ -837,56 +837,203 @@ class ToolHandlers:
     async def handle_initialize_new_agent(
         self, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Initialize a new agent with role and memory layer configuration."""
+        """Initialize a new agent with enhanced functionality from agent_startup."""
         try:
+            # Extract parameters with defaults matching agent_startup prompt
             agent_id = arguments.get("agent_id")
-            agent_role = arguments.get("agent_role", "general")
+            agent_role = arguments.get("agent_role")
             memory_layers = arguments.get("memory_layers", ["global", "learned"])
+            policy_version = arguments.get("policy_version", "latest")
+            policy_hash = arguments.get("policy_hash", "")
+            load_policies = arguments.get("load_policies", True)
             
+            # Auto-generate agent_id if not provided (like agent_startup)
             if not agent_id:
-                return {
-                    "isError": True,
-                    "content": [
-                        {"type": "text", "text": "agent_id is required"}
-                    ]
-                }
-
-            # Register the agent
-            result = await self.memory_manager.register_agent(
-                agent_id=agent_id,
-                agent_role=agent_role,
-                memory_layers=memory_layers
-            )
-
-            if result["success"]:
-                return {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                f"✅ Agent '{agent_id}' initialized successfully"
-                                f"\nRole: {agent_role}"
-                                f"\nMemory layers: {', '.join(memory_layers)}"
-                            )
-                        }
-                    ]
-                }
+                import uuid
+                agent_id = str(uuid.uuid4())
+            
+            # Auto-generate agent_role if not provided
+            if not agent_role:
+                agent_role = "general"
+            
+            # Convert string memory_layers to list if needed (for compatibility)
+            if isinstance(memory_layers, str):
+                memory_layers = [layer.strip() for layer in memory_layers.split(",")]
+            
+            initialization_messages = []
+            errors = []
+            
+            # Step 1: Register the agent
+            try:
+                if self.memory_manager:
+                    agent_result = await self.memory_manager.register_agent(
+                        agent_id=agent_id,
+                        agent_role=agent_role,
+                        memory_layers=memory_layers
+                    )
+                    
+                    if agent_result["success"]:
+                        initialization_messages.append(
+                            f"✅ Agent '{agent_id}' registered successfully"
+                        )
+                    else:
+                        errors.append(
+                            f"❌ Agent registration failed: "
+                            f"{agent_result.get('error', 'Unknown error')}"
+                        )
+                else:
+                    errors.append("❌ Memory manager not available")
+            except Exception as e:
+                errors.append(f"❌ Agent registration error: {str(e)}")
+            
+            # Step 2: Load and bind policies (if requested)
+            if load_policies:
+                try:
+                    from .policy_processor import PolicyProcessor
+                    policy_processor = PolicyProcessor()
+                    policy_result = await policy_processor.build_canonical_policy(
+                        directory=None,  # Use default policy directory
+                        policy_version=policy_version
+                    )
+                    
+                    if policy_result["success"]:
+                        initialization_messages.append(
+                            f"✅ Policy version '{policy_version}' loaded"
+                        )
+                        initialization_messages.append(
+                            f"📁 Files processed: "
+                            f"{policy_result.get('files_processed', 0)}"
+                        )
+                        initialization_messages.append(
+                            f"📝 Rules loaded: "
+                            f"{policy_result.get('unique_rules', 0)}"
+                        )
+                        
+                        # Update policy hash if we got one from policy load
+                        if policy_result.get('policy_hash') and not policy_hash:
+                            policy_hash = policy_result['policy_hash']
+                    else:
+                        errors.append(
+                            f"❌ Policy loading failed: "
+                            f"{policy_result.get('error', 'Unknown error')}"
+                        )
+                except Exception as e:
+                    errors.append(f"❌ Policy loading error: {str(e)}")
+            
+            # Step 3: Get system info
+            system_info = ""
+            try:
+                if self.memory_manager:
+                    agents_result = await self.memory_manager.list_agents()
+                    agent_count = len(agents_result) if agents_result else 0
+                    system_info = f"\n📊 System Status: {agent_count} agents active"
+            except Exception as e:
+                system_info = f"\n⚠️ System Status: Unable to fetch ({str(e)})"
+            
+            # Determine overall status
+            if errors:
+                status = "error"
+                status_icon = "❌"
+                status_text = "FAILED"
             else:
-                return {
-                    "isError": True,
-                    "content": [
-                        {"type": "text", "text": f"Failed: {result['error']}"}
-                    ]
-                }
-
+                status = "success"
+                status_icon = "✅"
+                status_text = "SUCCESS"
+            
+            # Build response content (same format as agent_startup)
+            response_lines = [
+                f"# Agent Startup {status_text}",
+                "",
+                "## Agent Identity",
+                f"- **Agent ID:** `{agent_id}`",
+                f"- **Role:** `{agent_role}`",
+                f"- **Initialization Time:** {datetime.now().isoformat()}",
+                "",
+                "## Initialization Results"
+            ]
+            
+            # Add success messages
+            if initialization_messages:
+                response_lines.extend(initialization_messages)
+            
+            # Add error messages
+            if errors:
+                response_lines.append("")
+                response_lines.append("### Errors:")
+                response_lines.extend(errors)
+            
+            # Calculate policy hash display
+            policy_hash_display = (
+                policy_hash[:12] + '...' if policy_hash
+                else 'Not available'
+            )
+            
+            response_lines.extend([
+                "",
+                "## Configuration",
+                f"- **Memory Layers:** {', '.join(memory_layers)}",
+                f"- **Policy Version:** `{policy_version}`",
+                f"- **Policy Hash:** `{policy_hash_display}`",
+                "",
+                f"{status_icon} Agent initialization {status_text.lower()}",
+                system_info
+            ])
+            
+            prompt_content = "\n".join(response_lines)
+            
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt_content
+                    }
+                ],
+                "metadata": {
+                    "agent_id": agent_id,
+                    "agent_role": agent_role,
+                    "memory_layers": memory_layers,
+                    "policy_version": policy_version,
+                    "policy_hash": policy_hash,
+                    "initialization_success": len(errors) == 0,
+                    "errors": errors
+                },
+                "isError": len(errors) > 0
+            }
+            
         except Exception as e:
-            logger.error(f"Error initializing agent: {e}")
+            logger.error(f"Error in enhanced initialize_new_agent: {e}")
             return {
                 "isError": True,
                 "content": [
                     {"type": "text", "text": f"Error initializing agent: {str(e)}"}
                 ]
             }
+
+    async def handle_initialize_development_agent(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Initialize a development agent with developer-optimized defaults."""
+        dev_arguments = {
+            "agent_id": arguments.get("agent_id"),
+            "agent_role": "developer",
+            "memory_layers": ["global", "learned", "agent"],
+            "policy_version": "latest",
+            "load_policies": True
+        }
+        return await self.handle_initialize_new_agent(dev_arguments)
+
+    async def handle_initialize_testing_agent(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Initialize a testing agent with testing-optimized defaults."""
+        test_arguments = {
+            "agent_id": arguments.get("agent_id"),
+            "agent_role": "tester",
+            "memory_layers": ["global", "learned"],
+            "policy_version": "latest",
+            "load_policies": True
+        }
+        return await self.handle_initialize_new_agent(test_arguments)
 
     async def handle_configure_agent_permissions(
         self, arguments: Dict[str, Any]
@@ -1559,7 +1706,7 @@ class ToolHandlers:
             import json
             
             # Group by section
-            sections = {}
+            sections: Dict[str, list] = {}
             policy_hash = None
             
             for entry in policy_entries:
@@ -1691,6 +1838,72 @@ class ToolHandlers:
                 "error": str(e)
             }
 
+    # =============================================================================
+    # GUIDANCE TOOLS - Phase 3
+    # =============================================================================
+
+    def _get_guidance_content(self, guidance_type: str) -> Dict[str, Any]:
+        """Get guidance content for a specific type."""
+        guidance_map = {
+            "memory_usage": "# Memory Usage Best Practices\n\n## Core Principles\n• Layer-appropriate storage (Global/Learned/Agent)\n• Query optimization with specific terms\n• Well-structured, searchable content\n\n## Best Practices\n✅ Before storing: verify uniqueness, choose type, add metadata\n✅ When querying: start specific, use filters, adjust thresholds\n✅ Maintenance: deduplicate, update, clean obsolete content\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**",
+            "context_preservation": "# Context Preservation Strategy\n\n## Key Strategies\n• Session checkpoints with key decisions\n• Progressive context building across sessions\n• Categorize: immediate/session/historical context\n\n## Implementation\n✅ Before session end: summarize outcomes, store context, link memories\n✅ Session startup: query previous context, rebuild state, identify next steps\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**",
+            "query_optimization": "# Query Optimization Best Practices\n\n## Fundamentals\n• Specificity over breadth\n• Context-aware queries with technical terms\n• Memory type targeting (Global/Learned/Agent)\n\n## Advanced Techniques\n✅ Similarity thresholds: 0.9+ exact, 0.8-0.9 related, 0.7-0.8 discovery\n✅ Progressive queries: start specific, broaden if needed\n✅ Keyword optimization: technical terms, action words, context markers\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**",
+            "markdown_optimization": "# Markdown Processing Guidelines\n\n## Processing Principles\n• Structure preservation (headings, code blocks, tables)\n• Metadata extraction (headers, tags, categories)\n• Content optimization for memory storage\n\n## Best Practices\n✅ Pre-processing: clean, normalize, extract key info\n✅ Chunking: header-based, size-based, context-aware\n✅ Quality assurance: validate syntax, check metadata\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**",
+            "duplicate_detection": "# Duplicate Detection Strategy\n\n## Detection Methods\n• Cosine similarity analysis (0.95+ exact, 0.85-0.95 near-duplicates)\n• Content hash comparison\n• Metadata-based detection\n\n## Workflow\n✅ Pre-storage: calculate hash, check matches, flag duplicates\n✅ Post-storage: periodic scans, review near-duplicates\n✅ Handling: skip/replace exact, review near-duplicates, cross-reference related\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**",
+            "directory_processing": "# Directory Processing Best Practices\n\n## Planning Phase\n• Directory assessment: size, file types, structure\n• Processing strategy: batch size, parallel processing, error handling\n\n## Execution\n✅ Pre-processing validation: check access, space, connectivity\n✅ File processing order: prioritize importance, handle dependencies\n✅ Error recovery: graceful degradation, retry logic, logging\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**",
+            "memory_type_selection": "# Memory Type Selection Criteria\n\n## Decision Framework\n• Who needs this? Everyone→Global, Future agents→Learned, Just me→Agent\n• How long persist? Permanent→Global/Learned, Session→Agent\n• Content type? Docs→Global, Insights→Learned, Notes→Agent\n\n## Examples\n✅ Global: API docs, policies, specifications\n✅ Learned: patterns, best practices, lessons learned\n✅ Agent: current tasks, preferences, session context\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**",
+            "memory_type_suggestion": "# AI Memory Type Suggestions\n\n## Detection Factors\n• Scope indicators: personal pronouns→Agent, universal→Global, learning→Learned\n• Temporal indicators: \"currently\"→Agent, \"always\"→Global, \"learned\"→Learned\n• Content patterns: documentation→Global, insights→Learned, tasks→Agent\n\n## Implementation\n✅ Analyze content semantically, provide confidence scores\n✅ Consider context clues, allow user overrides\n✅ Learn from corrections, improve over time\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**",
+            "policy_compliance": "# Policy Compliance Guide\n\n## Framework Understanding\n• Policy structure: principles, forbidden actions, required sections, style guide\n• Compliance levels: critical, important, recommended, stylistic\n\n## Workflow\n✅ Pre-action: review policies, assess impact, document reasoning\n✅ During action: monitor conflicts, adjust approach, document decisions\n✅ Post-action: verify compliance, log questions, update procedures\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**",
+            "policy_violation_recovery": "# Policy Violation Recovery\n\n## Immediate Response\n• Stop and assess: halt action, identify violation, assess impact\n• Document everything: what, when, intended vs actual, impact\n• Immediate containment: prevent further violations, secure systems\n\n## Recovery Process\n✅ Severity assessment: critical, major, minor violations\n✅ Recovery actions: escalation, investigation, remediation\n✅ Learning: analyze causes, implement improvements, share lessons\n\n**Full guidance: see docs/GUIDANCE_CONTENT.md**"
+        }
+        
+        content = guidance_map.get(guidance_type, "Guidance content not found.")
+        return {
+            "content": [
+                {"type": "text", "text": content}
+            ]
+        }
+
+    def handle_get_memory_usage_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance on effective memory usage patterns."""
+        return self._get_guidance_content("memory_usage")
+
+    def handle_get_context_preservation_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance on preserving context across sessions."""
+        return self._get_guidance_content("context_preservation")
+
+    def handle_get_query_optimization_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance on optimizing memory queries and retrieval."""
+        return self._get_guidance_content("query_optimization")
+
+    def handle_get_markdown_optimization_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance on processing and storing markdown content."""
+        return self._get_guidance_content("markdown_optimization")
+
+    def handle_get_duplicate_detection_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance on detecting and handling duplicate content."""
+        return self._get_guidance_content("duplicate_detection")
+
+    def handle_get_directory_processing_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance on batch processing directories."""
+        return self._get_guidance_content("directory_processing")
+
+    def handle_get_memory_type_selection_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance on selecting appropriate memory types."""
+        return self._get_guidance_content("memory_type_selection")
+
+    def handle_get_memory_type_suggestion_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance for AI-powered memory type suggestions."""
+        return self._get_guidance_content("memory_type_suggestion")
+
+    def handle_get_policy_compliance_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance for following policy compliance."""
+        return self._get_guidance_content("policy_compliance")
+
+    def handle_get_policy_violation_recovery_guidance(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Provide guidance for recovering from policy violations."""
+        return self._get_guidance_content("policy_violation_recovery")
+
     async def handle_tool_call(
         self, tool_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -1729,6 +1942,8 @@ class ToolHandlers:
                 "batch_process_directory": self.handle_batch_process_directory,
                 # Agent management tools
                 "initialize_new_agent": self.handle_initialize_new_agent,
+                "initialize_development_agent": self.handle_initialize_development_agent,
+                "initialize_testing_agent": self.handle_initialize_testing_agent,
                 "configure_agent_permissions": self.handle_configure_agent_permissions,
                 "query_memory_for_agent": self.handle_query_memory_for_agent,
                 "store_agent_action": self.handle_store_agent_action,
@@ -1737,6 +1952,17 @@ class ToolHandlers:
                 "get_policy_rulebook": self.handle_get_policy_rulebook,
                 "validate_json_against_schema": self.handle_validate_json_against_schema,
                 "log_policy_violation": self.handle_log_policy_violation,
+                # Guidance tools - Phase 3
+                "get_memory_usage_guidance": self.handle_get_memory_usage_guidance,
+                "get_context_preservation_guidance": self.handle_get_context_preservation_guidance,
+                "get_query_optimization_guidance": self.handle_get_query_optimization_guidance,
+                "get_markdown_optimization_guidance": self.handle_get_markdown_optimization_guidance,
+                "get_duplicate_detection_guidance": self.handle_get_duplicate_detection_guidance,
+                "get_directory_processing_guidance": self.handle_get_directory_processing_guidance,
+                "get_memory_type_selection_guidance": self.handle_get_memory_type_selection_guidance,
+                "get_memory_type_suggestion_guidance": self.handle_get_memory_type_suggestion_guidance,
+                "get_policy_compliance_guidance": self.handle_get_policy_compliance_guidance,
+                "get_policy_violation_recovery_guidance": self.handle_get_policy_violation_recovery_guidance,
             }
             
             if tool_name in handler_map:
