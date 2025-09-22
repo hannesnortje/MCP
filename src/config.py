@@ -29,6 +29,7 @@ class Config:
     LEARNED_MEMORY_COLLECTION: str = "learned_memory" 
     AGENT_MEMORY_COLLECTION: str = "agent_specific_memory"
     FILE_METADATA_COLLECTION: str = "file_metadata"
+    AGENT_REGISTRY_COLLECTION: str = "agent_registry"
 
     # Agent Configuration
     DEFAULT_AGENT_ID: str = os.getenv("DEFAULT_AGENT_ID", "default")
@@ -37,7 +38,9 @@ class Config:
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
     @classmethod
-    def get_collection_name(cls, memory_type: str, agent_id: Optional[str] = None) -> str:
+    def get_collection_name(
+        cls, memory_type: str, agent_id: Optional[str] = None
+    ) -> str:
         """Get the collection name for a specific memory type and agent."""
         if memory_type == "global":
             return cls.GLOBAL_MEMORY_COLLECTION

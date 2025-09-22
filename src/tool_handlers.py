@@ -828,6 +828,280 @@ class ToolHandlers:
                 ]
             }
 
+    # Agent Management Tools
+
+    async def handle_initialize_new_agent(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Initialize a new agent with role and memory layer configuration."""
+        try:
+            agent_id = arguments.get("agent_id")
+            agent_role = arguments.get("agent_role", "general")
+            memory_layers = arguments.get("memory_layers", ["global", "learned"])
+            
+            if not agent_id:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "agent_id is required"}
+                    ]
+                }
+
+            # Register the agent
+            result = await self.memory_manager.register_agent(
+                agent_id=agent_id,
+                agent_role=agent_role,
+                memory_layers=memory_layers
+            )
+
+            if result["success"]:
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"✅ Agent '{agent_id}' initialized successfully"
+                                f"\nRole: {agent_role}"
+                                f"\nMemory layers: {', '.join(memory_layers)}"
+                            )
+                        }
+                    ]
+                }
+            else:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": f"Failed: {result['error']}"}
+                    ]
+                }
+
+        except Exception as e:
+            logger.error(f"Error initializing agent: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", "text": f"Error initializing agent: {str(e)}"}
+                ]
+            }
+
+    async def handle_configure_agent_permissions(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Configure agent permissions for memory layer access."""
+        try:
+            agent_id = arguments.get("agent_id")
+            permissions = arguments.get("permissions", {})
+            
+            if not agent_id:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "agent_id is required"}
+                    ]
+                }
+
+            # Update agent permissions
+            result = await self.memory_manager.update_agent_permissions(
+                agent_id=agent_id,
+                permissions=permissions
+            )
+
+            if result["success"]:
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"✅ Permissions updated for agent '{agent_id}'"
+                                f"\nRead access: {permissions.get('can_read', [])}"
+                                f"\nWrite access: {permissions.get('can_write', [])}"
+                                f"\nAdmin access: {permissions.get('can_admin', [])}"
+                            )
+                        }
+                    ]
+                }
+            else:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": f"Failed: {result['error']}"}
+                    ]
+                }
+
+        except Exception as e:
+            logger.error(f"Error configuring agent permissions: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Error configuring permissions: {str(e)}"
+                    }
+                ]
+            }
+
+    async def handle_query_memory_for_agent(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Query memory for an agent with permission-based access control."""
+        try:
+            agent_id = arguments.get("agent_id")
+            query = arguments.get("query")
+            memory_layers = arguments.get("memory_layers", ["global", "learned"])
+            limit = arguments.get("limit", 10)
+            
+            if not agent_id or not query:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "agent_id and query are required"}
+                    ]
+                }
+
+            # Check agent permissions for each memory layer
+            allowed_layers = []
+            for memory_type in memory_layers:
+                has_permission = await self.memory_manager.check_agent_permission(
+                    agent_id=agent_id,
+                    action="read",
+                    memory_type=memory_type
+                )
+                if has_permission:
+                    allowed_layers.append(memory_type)
+
+            if not allowed_layers:
+                return {
+                    "isError": True,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"Agent {agent_id} has no read permissions "
+                                f"for requested memory layers"
+                            )
+                        }
+                    ]
+                }
+
+            # Query memory with allowed layers
+            result = await self.memory_manager.query_memory(
+                query=query,
+                memory_types=allowed_layers,
+                limit=limit,
+                agent_id=agent_id
+            )
+
+            if result["success"]:
+                results_text = []
+                for i, memory_result in enumerate(result["results"], 1):
+                    results_text.append(
+                        f"**Result {i}** (Score: {memory_result['score']:.3f}, "
+                        f"Type: {memory_result['memory_type']})\n"
+                        f"{memory_result['content']}\n"
+                    )
+                
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                f"🔍 Found {len(result['results'])} results "
+                                f"for agent '{agent_id}'"
+                                f"\nAllowed memory layers: "
+                                f"{', '.join(allowed_layers)}\n\n"
+                                + "\n".join(results_text)
+                            )
+                        }
+                    ]
+                }
+            else:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": f"Query failed: {result['error']}"}
+                    ]
+                }
+
+        except Exception as e:
+            logger.error(f"Error querying memory for agent: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Error querying memory: {str(e)}"
+                    }
+                ]
+            }
+
+    async def handle_store_agent_action(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Store an agent action with optional learned memory integration."""
+        try:
+            agent_id = arguments.get("agent_id")
+            action = arguments.get("action")
+            context = arguments.get("context", {})
+            outcome = arguments.get("outcome")
+            learn = arguments.get("learn", False)
+            
+            if not agent_id or not action or not outcome:
+                return {
+                    "isError": True,
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "agent_id, action, and outcome are required"
+                        }
+                    ]
+                }
+
+            # Log the action
+            result = await self.memory_manager.log_agent_action(
+                agent_id=agent_id,
+                action=action,
+                context=context,
+                outcome=outcome,
+                store_as_learned=learn
+            )
+
+            if result["success"]:
+                response_text = (
+                    f"✅ Action logged for agent '{agent_id}'"
+                    f"\nAction: {action}"
+                    f"\nOutcome: {outcome}"
+                )
+                
+                if result["stored_as_learned"]:
+                    response_text += (
+                        "\n📚 Stored as learned memory for future reference"
+                    )
+                
+                return {
+                    "content": [
+                        {"type": "text", "text": response_text}
+                    ]
+                }
+            else:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": f"Failed: {result['error']}"}
+                    ]
+                }
+
+        except Exception as e:
+            logger.error(f"Error storing agent action: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Error storing action: {str(e)}"
+                    }
+                ]
+            }
+
     async def handle_tool_call(
         self, tool_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -862,6 +1136,11 @@ class ToolHandlers:
                 "process_markdown_file": self.handle_process_markdown_file,
                 "batch_process_markdown_files": self.handle_batch_process_markdown_files,
                 "batch_process_directory": self.handle_batch_process_directory,
+                # Agent management tools
+                "initialize_new_agent": self.handle_initialize_new_agent,
+                "configure_agent_permissions": self.handle_configure_agent_permissions,
+                "query_memory_for_agent": self.handle_query_memory_for_agent,
+                "store_agent_action": self.handle_store_agent_action,
             }
             
             if tool_name in handler_map:
