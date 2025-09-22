@@ -5,6 +5,7 @@ Handles the MCP protocol communication and tool orchestration.
 
 import json
 import sys
+import asyncio
 from typing import Dict, Any, List, Optional
 
 from .server_config import get_logger, MCP_PROTOCOL_VERSION, MCP_SERVER_INFO
@@ -244,14 +245,153 @@ class MemoryMCPServer:
                     },
                     "required": ["situation"]
                 }
+            },
+            # New Markdown Processing Tools
+            {
+                "name": "scan_workspace_markdown",
+                "description": (
+                    "Scan directory for markdown files with configurable "
+                    "recursive search"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "directory": {
+                            "type": "string",
+                            "description": (
+                                "Directory path to scan "
+                                "(default current directory)"
+                            )
+                        },
+                        "recursive": {
+                            "type": "boolean",
+                            "description": (
+                                "Whether to scan subdirectories "
+                                "(default true)"
+                            )
+                        }
+                    },
+                    "required": []
+                }
+            },
+            {
+                "name": "analyze_markdown_content",
+                "description": (
+                    "Analyze markdown content and suggest appropriate "
+                    "memory type with AI integration hooks"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "Markdown content to analyze"
+                        },
+                        "suggest_memory_type": {
+                            "type": "boolean",
+                            "description": (
+                                "Whether to suggest memory type (default true)"
+                            )
+                        },
+                        "ai_enhance": {
+                            "type": "boolean",
+                            "description": (
+                                "Whether to apply AI enhancements (default true)"
+                            )
+                        }
+                    },
+                    "required": ["content"]
+                }
+            },
+            {
+                "name": "optimize_content_for_storage",
+                "description": (
+                    "Optimize content for database storage based on "
+                    "memory type with AI enhancement hooks"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "Content to optimize"
+                        },
+                        "memory_type": {
+                            "type": "string",
+                            "enum": ["global", "learned", "agent"],
+                            "description": (
+                                "Target memory type (default global)"
+                            )
+                        },
+                        "ai_optimization": {
+                            "type": "boolean",
+                            "description": (
+                                "Whether to apply AI optimizations (default true)"
+                            )
+                        },
+                        "suggested_type": {
+                            "type": "string",
+                            "enum": ["global", "learned", "agent"],
+                            "description": (
+                                "Originally suggested memory type for comparison"
+                            )
+                        }
+                    },
+                    "required": ["content"]
+                }
+            },
+            {
+                "name": "process_markdown_directory",
+                "description": (
+                    "Process entire directory of markdown files with "
+                    "batch AI-enhanced analysis and memory type suggestions"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "directory": {
+                            "type": "string",
+                            "description": (
+                                "Directory to process (default current directory)"
+                            )
+                        },
+                        "memory_type": {
+                            "type": "string",
+                            "enum": ["global", "learned", "agent"],
+                            "description": (
+                                "Fixed memory type (null for auto-suggestion)"
+                            )
+                        },
+                        "auto_suggest": {
+                            "type": "boolean",
+                            "description": (
+                                "Whether to auto-suggest memory types "
+                                "(default true)"
+                            )
+                        },
+                        "ai_enhance": {
+                            "type": "boolean",
+                            "description": (
+                                "Whether to apply AI enhancements (default true)"
+                            )
+                        },
+                        "recursive": {
+                            "type": "boolean",
+                            "description": (
+                                "Whether to scan subdirectories (default true)"
+                            )
+                        }
+                    },
+                    "required": []
+                }
             }
         ]
 
-    def handle_tool_call(
+    async def handle_tool_call(
         self, tool_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Handle a tool call and return the result."""
-        return self.tool_handlers.handle_tool_call(tool_name, arguments)
+        return await self.tool_handlers.handle_tool_call(tool_name, arguments)
 
 
 def send_response(
@@ -280,7 +420,7 @@ def send_notification(method: str, params: Dict[str, Any] = None):
     print(json.dumps(notification), flush=True)
 
 
-def run_mcp_server():
+async def run_mcp_server():
     """Main server loop for MCP protocol handling."""
     logger.info("Memory MCP Server ready, waiting for connections...")
     
@@ -320,7 +460,7 @@ def run_mcp_server():
                 tool_name = data.get("params", {}).get("name")
                 arguments = data.get("params", {}).get("arguments", {})
                 
-                result = server.handle_tool_call(tool_name, arguments)
+                result = await server.handle_tool_call(tool_name, arguments)
                 send_response(request_id, result)
                 
             else:

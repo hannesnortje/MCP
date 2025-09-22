@@ -6,6 +6,7 @@ vector database.
 """
 
 import sys
+import asyncio
 
 from src.server_config import get_logger
 from src.mcp_server import run_mcp_server
@@ -17,7 +18,7 @@ def main():
     """Main entry point for the Memory MCP Server."""
     try:
         logger.info("Starting Memory MCP Server...")
-        run_mcp_server()
+        asyncio.run(run_mcp_server())
     except KeyboardInterrupt:
         logger.info("Memory server interrupted")
     except EOFError:

@@ -38,6 +38,26 @@ DOCKER_COMMAND_TIMEOUT = 30
 QDRANT_STARTUP_TIMEOUT = 15
 HEALTH_CHECK_TIMEOUT = 5
 
+# Markdown Processing Configuration
+MARKDOWN_CHUNK_SIZE = 900  # Maximum tokens per chunk
+MARKDOWN_CHUNK_OVERLAP = 200  # Token overlap between chunks
+MARKDOWN_PROCESSING_RECURSIVE = True  # Default recursive directory scanning
+
+# AI Enhancement Configuration
+AI_ENHANCEMENT_ENABLED = True  # Enable AI-driven content optimization
+AI_ANALYSIS_DEPTH = "standard"  # Options: "basic", "standard", "deep"
+AI_CONTENT_OPTIMIZATION = True  # Enable AI content optimization
+
+# Policy Processing Configuration
+POLICY_DIRECTORY_DEFAULT = "./policy"  # Default policy directory
+POLICY_RULE_ID_PATTERN = r"^[A-Z]+-\d+$"  # Valid rule ID format
+POLICY_VALIDATION_STRICT = True  # Strict policy validation
+POLICY_HASH_ALGORITHM = "sha256"  # Hash algorithm for policy versioning
+
+# Memory Type Analysis Configuration
+MEMORY_TYPE_CONFIDENCE_THRESHOLD = 0.6  # Minimum confidence for suggestions
+MEMORY_TYPE_SUGGESTION_ENABLED = True  # Enable memory type suggestions
+
 # MCP Capabilities
 MCP_CAPABILITIES = {
     "tools": {
