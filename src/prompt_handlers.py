@@ -31,6 +31,9 @@ class PromptHandlers:
     def __init__(self, memory_manager: Any = None) -> None:
         """Initialize prompt handlers with optional memory manager."""
         self.memory_manager = memory_manager
+        # Initialize policy processor for agent startup operations
+        from .policy_processor import PolicyProcessor
+        self.policy_processor = PolicyProcessor()
         logger.info("PromptHandlers initialized")
     
     def list_prompts(self) -> List[Dict[str, Any]]:
@@ -289,7 +292,9 @@ class PromptHandlers:
     async def _get_agent_startup_prompt(
         self, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Core agent startup prompt with full configuration."""
+        """
+        Core agent startup prompt with full configuration and initialization.
+        """
         agent_id = arguments.get("agent_id")
         agent_role = arguments.get("agent_role")
         memory_layers = arguments.get("memory_layers", "global,learned")
@@ -310,62 +315,132 @@ class PromptHandlers:
             layer_list = [layer.strip() for layer in memory_layers.split(",")]
         else:
             layer_list = memory_layers or ["global", "learned"]
-        
-        # Get system info if memory manager available
+
+        initialization_messages = []
+        errors = []
+
+        # Step 1: Register the agent
+        try:
+            if self.memory_manager:
+                agent_result = await self.memory_manager.register_agent(
+                    agent_id=agent_id,
+                    agent_role=agent_role,
+                    memory_layers=layer_list
+                )
+                
+                if agent_result["success"]:
+                    initialization_messages.append(
+                        f"✅ Agent '{agent_id}' registered successfully"
+                    )
+                else:
+                    errors.append(
+                        f"❌ Agent registration failed: "
+                        f"{agent_result.get('error', 'Unknown error')}"
+                    )
+            else:
+                errors.append("❌ Memory manager not available")
+        except Exception as e:
+            errors.append(f"❌ Agent registration error: {str(e)}")
+
+        # Step 2: Load and bind policies
+        try:
+            if self.policy_processor:
+                policy_result = await \
+                    self.policy_processor.build_canonical_policy(
+                        directory=None,  # Use default policy directory
+                        policy_version=policy_version
+                    )
+                
+                if policy_result["success"]:
+                    initialization_messages.append(
+                        f"✅ Policy version '{policy_version}' loaded"
+                    )
+                    initialization_messages.append(
+                        f"📁 Files processed: "
+                        f"{policy_result.get('files_processed', 0)}"
+                    )
+                    initialization_messages.append(
+                        f"📝 Rules loaded: "
+                        f"{policy_result.get('unique_rules', 0)}"
+                    )
+                    
+                    # Update policy hash if we got one from policy load
+                    if policy_result.get('policy_hash') and not policy_hash:
+                        policy_hash = policy_result['policy_hash']
+                        
+                else:
+                    errors.append(
+                        f"❌ Policy loading failed: "
+                        f"{policy_result.get('error', 'Unknown error')}"
+                    )
+            else:
+                errors.append("❌ Policy processor not available")
+        except Exception as e:
+            errors.append(f"❌ Policy loading error: {str(e)}")
+
+        # Get system info
         system_info = ""
-        if self.memory_manager:
-            try:
+        try:
+            if self.memory_manager:
                 agents_result = await self.memory_manager.list_agents()
                 agent_count = len(agents_result) if agents_result else 0
                 system_info = f"\n📊 System Status: {agent_count} agents active"
-            except Exception as e:
-                system_info = f"\n⚠️ System Status: Unable to fetch ({e})"
+        except Exception as e:
+            system_info = f"\n⚠️ System Status: Unable to fetch ({str(e)})"
+
+        # Determine overall status
+        if errors:
+            status = "error"
+            status_icon = "❌"
+            status_text = "FAILED"
+        else:
+            status = "success"
+            status_icon = "✅"
+            status_text = "SUCCESS"
+
+        # Build response content
+        response_lines = [
+            f"# Agent Startup {status_text}",
+            "",
+            "## Agent Identity",
+            f"- **Agent ID:** `{agent_id}`",
+            f"- **Role:** `{agent_role}`",
+            f"- **Initialization Time:** {datetime.now().isoformat()}",
+            "",
+            "## Initialization Results"
+        ]
         
-        prompt_content = f"""# Agent Startup Configuration
+        # Add success messages
+        if initialization_messages:
+            response_lines.extend(initialization_messages)
+            
+        # Add error messages
+        if errors:
+            response_lines.append("")
+            response_lines.append("### Errors:")
+            response_lines.extend(errors)
 
-## Agent Identity
-- **Agent ID:** `{agent_id}`
-- **Role:** `{agent_role}`
-- **Initialization Time:** {datetime.now().isoformat()}
+        # Calculate policy hash display
+        policy_hash_display = (
+            policy_hash[:12] + '...' if policy_hash
+            else 'Not available'
+        )
 
-## Memory System Configuration
-### Assigned Memory Layers
-{chr(10).join(f"- ✅ **{layer}** memory access" for layer in layer_list)}
+        response_lines.extend([
+            "",
+            "## Configuration",
+            f"- **Memory Layers:** {', '.join(layer_list)}",
+            f"- **Policy Version:** `{policy_version}`",
+            f"- **Policy Hash:** `{policy_hash_display}`",
+            "",
+            f"{status_icon} Agent initialization {status_text.lower()}",
+            system_info
+        ])
 
-### Memory Access Permissions
-Based on your role as `{agent_role}`, you have:
-- **Read Access:** {', '.join(layer_list)} memory layers
-- **Write Access:** Determined by your role permissions
-- **Admin Access:** Contact system administrator if needed
-
-## Policy Compliance
-- **Policy Version:** `{policy_version}`
-- **Policy Hash:** `{policy_hash or 'Not specified'}`
-- **Compliance Required:** ✅ All operations must follow policy guidelines
-
-## Startup Checklist
-1. ✅ Agent identity configured
-2. ✅ Memory layers assigned: {', '.join(layer_list)}
-3. ✅ Policy binding established
-4. 🔄 Ready for memory operations
-
-## Next Steps
-1. **Test Memory Access:** Verify you can read from assigned memory layers
-2. **Review Policy:** Check policy compliance guide if needed
-3. **Begin Operations:** Start your assigned tasks with memory support
-
-## Quick Commands
-- Use memory query tools to access your assigned layers
-- Follow memory type selection criteria for optimal storage
-- Report any policy violations immediately
-
----
-*Agent `{agent_id}` initialized successfully with `{agent_role}` role*
-{system_info}
-"""
+        prompt_content = "\n".join(response_lines)
         
         return {
-            "status": "success",
+            "status": status,
             "prompt": {
                 "name": "agent_startup",
                 "content": prompt_content,
@@ -376,7 +451,9 @@ Based on your role as `{agent_role}`, you have:
                     "agent_role": agent_role,
                     "memory_layers": layer_list,
                     "policy_version": policy_version,
-                    "policy_hash": policy_hash
+                    "policy_hash": policy_hash,
+                    "initialization_success": len(errors) == 0,
+                    "errors": errors
                 }
             }
         }
