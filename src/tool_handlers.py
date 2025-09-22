@@ -388,6 +388,84 @@ class ToolHandlers:
                 ]
             }
         
+    async def handle_validate_and_deduplicate(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Handle validate_and_deduplicate tool call."""
+        try:
+            content = arguments.get("content", "")
+            memory_type = arguments.get("memory_type", "global")
+            agent_id = arguments.get("agent_id")
+            threshold = arguments.get("threshold")
+            enable_near_miss = arguments.get("enable_near_miss", True)
+            
+            if not content.strip():
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "Content cannot be empty"}
+                    ]
+                }
+            
+            # Check for duplicates using enhanced similarity detection
+            result = self.memory_manager.async_check_duplicate_with_similarity(
+                content=content,
+                memory_type=memory_type,
+                agent_id=agent_id,
+                threshold=threshold,
+                enable_near_miss=enable_near_miss
+            )
+            
+            # Format response
+            response_text = "Deduplication Analysis:\n\n"
+            response_text += f"Content: {content[:100]}{'...' if len(content) > 100 else ''}\n"
+            response_text += f"Memory Type: {memory_type}\n"
+            if agent_id:
+                response_text += f"Agent ID: {agent_id}\n"
+            response_text += f"Collection: {result.get('collection', 'unknown')}\n\n"
+            
+            if result.get('is_duplicate'):
+                response_text += f"🔍 DUPLICATE DETECTED\n"
+                response_text += f"Similarity Score: {result.get('similarity_score', 0):.3f}\n"
+                response_text += f"Matched Content: {result.get('matched_content', 'N/A')}\n"
+                response_text += f"Recommendation: Content already exists, consider skipping.\n"
+            elif result.get('is_near_miss'):
+                response_text += f"⚠️ NEAR-MISS DETECTED\n"
+                response_text += f"Similarity Score: {result.get('similarity_score', 0):.3f}\n"
+                response_text += f"Matched Content: {result.get('matched_content', 'N/A')}\n"
+                response_text += f"Recommendation: Review for potential similarity before adding.\n"
+            else:
+                response_text += f"✅ NO DUPLICATE FOUND\n"
+                response_text += f"Similarity Score: {result.get('similarity_score', 0):.3f}\n"
+                response_text += f"Recommendation: Safe to add to memory.\n"
+            
+            # Add diagnostics if available
+            if result.get('diagnostics') and enable_near_miss:
+                diag = result['diagnostics']
+                response_text += f"\nDiagnostics:\n"
+                response_text += f"• Duplicate threshold: {diag.get('duplicate_threshold', 'N/A')}\n"
+                response_text += f"• Near-miss threshold: {diag.get('near_miss_threshold', 'N/A')}\n"
+                response_text += f"• Total matches found: {diag.get('total_matches', 0)}\n"
+                
+                if diag.get('top_similarities'):
+                    response_text += f"• Top similarities:\n"
+                    for i, sim in enumerate(diag['top_similarities'][:3]):
+                        response_text += f"  {i+1}. Score: {sim.get('score', 0):.3f} - {sim.get('content_preview', 'N/A')}\n"
+            
+            return {
+                "content": [{"type": "text", "text": response_text}]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in validate_and_deduplicate: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", 
+                     "text": f"Failed to validate and deduplicate: {str(e)}"}
+                ]
+            }
+
     async def handle_tool_call(
         self, tool_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -416,6 +494,8 @@ class ToolHandlers:
                 "analyze_markdown_content": self.handle_analyze_markdown_content,
                 "optimize_content_for_storage": self.handle_optimize_content_for_storage,
                 "process_markdown_directory": self.handle_process_markdown_directory,
+                # Enhanced deduplication tool
+                "validate_and_deduplicate": self.handle_validate_and_deduplicate,
             }
             
             if tool_name in handler_map:

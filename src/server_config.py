@@ -58,6 +58,12 @@ POLICY_HASH_ALGORITHM = "sha256"  # Hash algorithm for policy versioning
 MEMORY_TYPE_CONFIDENCE_THRESHOLD = 0.6  # Minimum confidence for suggestions
 MEMORY_TYPE_SUGGESTION_ENABLED = True  # Enable memory type suggestions
 
+# Deduplication Configuration
+DEDUPLICATION_SIMILARITY_THRESHOLD = 0.85  # Duplicate detection threshold
+DEDUPLICATION_NEAR_MISS_THRESHOLD = 0.80   # Near-miss detection threshold
+DEDUPLICATION_LOGGING_ENABLED = True       # Enable deduplication logging
+DEDUPLICATION_DIAGNOSTICS_ENABLED = True   # Enable similarity diagnostics
+
 # MCP Capabilities
 MCP_CAPABILITIES = {
     "tools": {

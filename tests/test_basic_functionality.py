@@ -46,7 +46,7 @@ This concludes the test document.
         
         # Test adding to global memory
         logger.info("📝 Testing add to global memory...")
-        hash1 = await manager.add_to_memory(
+        hash1 = manager.async_add_to_memory(
             content=test_content,
             memory_type="global",
             metadata={"source": "test", "type": "documentation"}
@@ -54,7 +54,7 @@ This concludes the test document.
         
         # Test adding to learned memory
         logger.info("📝 Testing add to learned memory...")
-        hash2 = await manager.add_to_memory(
+        hash2 = manager.async_add_to_memory(
             content="Never deploy on Friday afternoons. Things go wrong.",
             memory_type="learned",
             metadata={"lesson_type": "deployment", "severity": "high"}
@@ -62,7 +62,7 @@ This concludes the test document.
         
         # Test adding to agent memory
         logger.info("📝 Testing add to agent memory...")
-        hash3 = await manager.add_to_memory(
+        hash3 = manager.async_add_to_memory(
             content="Agent context: I am a helpful coding assistant.",
             memory_type="agent",
             agent_id="test_agent",
@@ -73,16 +73,16 @@ This concludes the test document.
         logger.info("🔍 Testing memory queries...")
         
         # Query all memories
-        results = await manager.query_memory("test document", memory_type="all")
+        results = manager.async_query_memory("test document", memory_type="all")
         logger.info(f"Found {len(results)} results for 'test document'")
         
         # Query learned memory
-        results = await manager.query_memory("deploy", memory_type="learned")
+        results = manager.async_query_memory("deploy", memory_type="learned")
         logger.info(f"Found {len(results)} results for 'deploy' in learned memory")
         
         # Test duplicate detection
         logger.info("🔍 Testing duplicate detection...")
-        is_duplicate = await manager.check_duplicate(
+        is_duplicate = manager.async_check_duplicate(
             content=test_content,
             memory_type="global"
         )

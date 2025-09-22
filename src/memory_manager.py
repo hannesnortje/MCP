@@ -14,6 +14,12 @@ from qdrant_client.http.models import Distance, VectorParams, PointStruct
 from sentence_transformers import SentenceTransformer
 
 from src.config import Config
+from src.server_config import (
+    DEDUPLICATION_SIMILARITY_THRESHOLD,
+    DEDUPLICATION_NEAR_MISS_THRESHOLD,
+    DEDUPLICATION_LOGGING_ENABLED,
+    DEDUPLICATION_DIAGNOSTICS_ENABLED
+)
 
 logger = logging.getLogger(__name__)
 
@@ -553,19 +559,34 @@ class QdrantMemoryManager:
             logger.error(f"❌ Failed to query memory: {e}")
             raise
 
-    def async_check_duplicate(
+    def async_check_duplicate_with_similarity(
         self,
         content: str,
         memory_type: str,
         agent_id: Optional[str] = None,
-        threshold: Optional[float] = None
-    ) -> bool:
-        """Check if content already exists in memory (duplicate detection)."""
+        threshold: Optional[float] = None,
+        enable_near_miss: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Enhanced duplicate detection using cosine similarity.
+        
+        Args:
+            content: Text content to check for duplicates
+            memory_type: Type of memory to check ("global", "learned", "agent")
+            agent_id: Agent ID for agent-specific memory
+            threshold: Similarity threshold (defaults to config value)
+            enable_near_miss: Whether to detect and log near-misses
+            
+        Returns:
+            Dict containing duplicate detection results and diagnostics
+        """
         if not self.client or not self.embedding_model:
             raise RuntimeError("Memory manager not properly initialized")
 
         try:
-            threshold = threshold or Config.SIMILARITY_THRESHOLD
+            # Use configured thresholds
+            duplicate_threshold = threshold or DEDUPLICATION_SIMILARITY_THRESHOLD
+            near_miss_threshold = DEDUPLICATION_NEAR_MISS_THRESHOLD
             
             # Determine collection name
             if memory_type == "agent" and agent_id:
@@ -575,7 +596,12 @@ class QdrantMemoryManager:
                     col.name for col in self.client.get_collections().collections
                 }
                 if collection_name not in existing_collections:
-                    return False  # No collection means no duplicates
+                    return {
+                        "is_duplicate": False,
+                        "is_near_miss": False,
+                        "similarity_score": 0.0,
+                        "reason": "Collection does not exist"
+                    }
             else:
                 collection_name = Config.get_collection_name(memory_type)
 
@@ -586,23 +612,108 @@ class QdrantMemoryManager:
             search_results = self.client.search(
                 collection_name=collection_name,
                 query_vector=content_embedding,
-                limit=1,
-                score_threshold=threshold
+                limit=3,  # Get top 3 matches for diagnostics
+                score_threshold=0.5  # Lower threshold to catch near-misses
             )
 
-            # Check if any results exceed threshold
-            if search_results and search_results[0].score >= threshold:
-                logger.info(
-                    f"🔍 Duplicate detected in {collection_name} "
-                    f"(similarity: {search_results[0].score:.3f})"
-                )
-                return True
+            if not search_results:
+                return {
+                    "is_duplicate": False,
+                    "is_near_miss": False,
+                    "similarity_score": 0.0,
+                    "reason": "No similar content found"
+                }
 
-            return False
+            # Analyze the best match
+            best_match = search_results[0]
+            similarity_score = best_match.score
+            
+            is_duplicate = similarity_score >= duplicate_threshold
+            is_near_miss = (
+                enable_near_miss and 
+                not is_duplicate and 
+                similarity_score >= near_miss_threshold
+            )
+
+            # Prepare result
+            result = {
+                "is_duplicate": is_duplicate,
+                "is_near_miss": is_near_miss,
+                "similarity_score": similarity_score,
+                "matched_content_hash": best_match.id,
+                "matched_content": best_match.payload.get("content", "")[:100],
+                "collection": collection_name
+            }
+
+            # Add diagnostics if enabled
+            if DEDUPLICATION_DIAGNOSTICS_ENABLED:
+                result["diagnostics"] = {
+                    "duplicate_threshold": duplicate_threshold,
+                    "near_miss_threshold": near_miss_threshold,
+                    "total_matches": len(search_results),
+                    "top_similarities": [
+                        {
+                            "score": r.score,
+                            "content_preview": r.payload.get("content", "")[:50]
+                        }
+                        for r in search_results[:3]
+                    ]
+                }
+
+            # Log results if enabled
+            if DEDUPLICATION_LOGGING_ENABLED:
+                if is_duplicate:
+                    logger.info(
+                        f"🔍 DUPLICATE detected in {collection_name} "
+                        f"(similarity: {similarity_score:.3f} >= {duplicate_threshold})"
+                    )
+                elif is_near_miss:
+                    logger.info(
+                        f"⚠️ NEAR-MISS detected in {collection_name} "
+                        f"(similarity: {similarity_score:.3f}, threshold: "
+                        f"{near_miss_threshold}-{duplicate_threshold})"
+                    )
+                else:
+                    logger.debug(
+                        f"✅ No duplicate in {collection_name} "
+                        f"(best similarity: {similarity_score:.3f})"
+                    )
+
+            return result
 
         except Exception as e:
             logger.error(f"❌ Failed to check for duplicates: {e}")
-            # In case of error, assume no duplicate to be safe
+            return {
+                "is_duplicate": False,
+                "is_near_miss": False,
+                "similarity_score": 0.0,
+                "error": str(e)
+            }
+
+    def async_check_duplicate(
+        self,
+        content: str,
+        memory_type: str,
+        agent_id: Optional[str] = None,
+        threshold: Optional[float] = None
+    ) -> bool:
+        """
+        Legacy duplicate detection method - maintains backward compatibility.
+        
+        This method provides the same interface as before but uses the enhanced
+        cosine similarity detection under the hood.
+        """
+        try:
+            result = self.async_check_duplicate_with_similarity(
+                content=content,
+                memory_type=memory_type,
+                agent_id=agent_id,
+                threshold=threshold,
+                enable_near_miss=False
+            )
+            return result.get("is_duplicate", False)
+        except Exception as e:
+            logger.error(f"❌ Failed to check for duplicates: {e}")
             return False
 
     def async_delete_content(

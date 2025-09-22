@@ -384,6 +384,50 @@ class MemoryMCPServer:
                     },
                     "required": []
                 }
+            },
+            {
+                "name": "validate_and_deduplicate",
+                "description": (
+                    "Validate content for duplicates using enhanced cosine "
+                    "similarity detection with near-miss analysis"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "string",
+                            "description": "Content to check for duplicates"
+                        },
+                        "memory_type": {
+                            "type": "string",
+                            "enum": ["global", "learned", "agent"],
+                            "description": (
+                                "Memory type to check against (default global)"
+                            )
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": (
+                                "Agent ID for agent-specific memory checks"
+                            )
+                        },
+                        "threshold": {
+                            "type": "number",
+                            "description": (
+                                "Similarity threshold (0.0-1.0, "
+                                "defaults to configured value)"
+                            )
+                        },
+                        "enable_near_miss": {
+                            "type": "boolean",
+                            "description": (
+                                "Enable near-miss detection and logging "
+                                "(default true)"
+                            )
+                        }
+                    },
+                    "required": ["content"]
+                }
             }
         ]
 
