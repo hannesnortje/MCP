@@ -6,6 +6,7 @@ Enhanced with production-grade error handling and retry logic.
 
 import logging
 import hashlib
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -44,6 +45,31 @@ class QdrantMemoryManager:
         
         # Initialize synchronously for MCP server compatibility
         self._sync_initialize()
+
+    def _agent_id_to_point_id(self, agent_id: str) -> str:
+        """Convert agent ID to valid Qdrant point ID.
+        
+        Qdrant requires point IDs to be either unsigned integers or UUIDs.
+        This function converts any agent ID to a valid UUID using UUID5
+        (deterministic namespace-based UUID).
+        
+        Args:
+            agent_id: The original agent ID (may have prefixes like 'admin-')
+            
+        Returns:
+            A valid UUID string that can be used as Qdrant point ID
+        """
+        # If agent_id is already a valid UUID, use it directly
+        try:
+            uuid.UUID(agent_id)
+            return agent_id  # It's already a valid UUID
+        except ValueError:
+            pass
+        
+        # Create a deterministic UUID5 based on the agent_id
+        # Using a fixed namespace for consistency
+        namespace = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')
+        return str(uuid.uuid5(namespace, agent_id))
 
     @retry_qdrant_operation(max_attempts=3)
     def _sync_initialize(self) -> None:
@@ -917,7 +943,7 @@ class QdrantMemoryManager:
 
             # Store in agent registry
             point = PointStruct(
-                id=agent_id,  # Use agent_id as the point ID
+                id=self._agent_id_to_point_id(agent_id),
                 vector=embedding,
                 payload=agent_metadata
             )
@@ -948,7 +974,7 @@ class QdrantMemoryManager:
         try:
             result = self.client.retrieve(
                 collection_name=Config.AGENT_REGISTRY_COLLECTION,
-                ids=[agent_id]
+                ids=[self._agent_id_to_point_id(agent_id)]
             )
 
             if result:
@@ -993,7 +1019,7 @@ class QdrantMemoryManager:
 
             # Update in registry
             point = PointStruct(
-                id=agent_id,
+                id=self._agent_id_to_point_id(agent_id),
                 vector=embedding,
                 payload=agent_data
             )
