@@ -1,6 +1,7 @@
 """
 Tool implementation handlers for MCP Memory Server.
 Contains the actual logic for each tool, separated from MCP protocol handling.
+Enhanced with health monitoring and diagnostic capabilities.
 """
 
 from typing import Dict, Any
@@ -9,6 +10,7 @@ from datetime import datetime
 
 from .server_config import get_logger
 from .markdown_processor import MarkdownProcessor
+from .error_handler import error_handler
 
 logger = get_logger("tool-handlers")
 
@@ -1098,6 +1100,142 @@ class ToolHandlers:
                     {
                         "type": "text",
                         "text": f"Error storing action: {str(e)}"
+                    }
+                ]
+            }
+    
+    def handle_system_health(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle system health check tool call."""
+        try:
+            # Get health information
+            health_info = {
+                "timestamp": str(datetime.now()),
+                "memory_manager": {
+                    "available": self.memory_manager is not None,
+                    "initialized": (
+                        self.memory_manager is not None and 
+                        getattr(self.memory_manager, 'collections_initialized', False)
+                    )
+                },
+                "error_statistics": error_handler.get_error_stats(),
+                "components": {
+                    "markdown_processor": self.markdown_processor is not None
+                }
+            }
+            
+            # Test basic connectivity if memory manager is available
+            if self.memory_manager:
+                try:
+                    if hasattr(self.memory_manager, 'client') and self.memory_manager.client:
+                        collections = self.memory_manager.client.get_collections()
+                        health_info["components"]["qdrant"] = {
+                            "status": "healthy",
+                            "collections_count": len(collections.collections)
+                        }
+                    else:
+                        health_info["components"]["qdrant"] = {
+                            "status": "unavailable",
+                            "error": "No Qdrant client"
+                        }
+                        
+                    if hasattr(self.memory_manager, 'embedding_model') and self.memory_manager.embedding_model:
+                        health_info["components"]["embedding_model"] = {
+                            "status": "healthy",
+                            "model": str(self.memory_manager.embedding_model)
+                        }
+                    else:
+                        health_info["components"]["embedding_model"] = {
+                            "status": "unavailable"
+                        }
+                        
+                except Exception as e:
+                    health_info["components"]["qdrant"] = {
+                        "status": "error",
+                        "error": str(e)
+                    }
+            
+            # Determine overall health status
+            component_issues = []
+            for component, info in health_info["components"].items():
+                if isinstance(info, dict) and info.get("status") in ["unavailable", "error"]:
+                    component_issues.append(component)
+            
+            if not component_issues:
+                overall_status = "healthy"
+                status_text = "✅ All systems operational"
+            elif len(component_issues) == len(health_info["components"]):
+                overall_status = "critical"
+                status_text = f"❌ Critical: All components have issues: {', '.join(component_issues)}"
+            else:
+                overall_status = "degraded"
+                status_text = f"⚠️ Degraded: Issues with: {', '.join(component_issues)}"
+            
+            health_info["overall_status"] = overall_status
+            
+            # Format health info for display
+            health_text = f"""# System Health Report
+
+**Status:** {status_text}  
+**Timestamp:** {health_info['timestamp']}
+
+## Component Status
+
+### Memory Manager
+- **Available:** {'✅' if health_info['memory_manager']['available'] else '❌'}
+- **Initialized:** {'✅' if health_info['memory_manager']['initialized'] else '❌'}
+
+### Components
+"""
+            
+            for component, info in health_info["components"].items():
+                if isinstance(info, dict):
+                    status = info.get("status", "unknown")
+                    if status == "healthy":
+                        status_icon = "✅"
+                    elif status == "unavailable":
+                        status_icon = "⚠️"
+                    else:
+                        status_icon = "❌"
+                    
+                    health_text += f"- **{component.replace('_', ' ').title()}:** {status_icon} {status}\n"
+                    
+                    if "error" in info:
+                        health_text += f"  - Error: {info['error']}\n"
+                else:
+                    health_text += f"- **{component.replace('_', ' ').title()}:** {'✅' if info else '❌'}\n"
+            
+            # Add error statistics if available
+            error_stats = health_info.get("error_statistics", {})
+            if error_stats.get("total_errors", 0) > 0:
+                health_text += f"""
+## Error Statistics
+- **Total Errors:** {error_stats.get('total_errors', 0)}
+- **Recovery Attempts:** {error_stats.get('recovery_attempts', 0)}
+- **Successful Recoveries:** {error_stats.get('successful_recoveries', 0)}
+"""
+                
+                if error_stats.get("errors_by_category"):
+                    health_text += "\n### Errors by Category\n"
+                    for category, count in error_stats["errors_by_category"].items():
+                        health_text += f"- **{category.title()}:** {count}\n"
+            
+            return {
+                "content": [
+                    {
+                        "type": "text", 
+                        "text": health_text
+                    }
+                ]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in system health check: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"❌ Health check failed: {str(e)}"
                     }
                 ]
             }

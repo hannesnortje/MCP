@@ -1,11 +1,13 @@
 """
 MCP (Model Context Protocol) server implementation for memory management.
 Handles the MCP protocol communication and tool orchestration.
+Enhanced with production-grade error handling and monitoring.
 """
 
 import json
 import sys
 import asyncio
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 from .server_config import get_logger, MCP_PROTOCOL_VERSION, MCP_SERVER_INFO
@@ -13,6 +15,13 @@ from .qdrant_manager import ensure_qdrant_running
 from .tool_handlers import ToolHandlers
 from .resource_handlers import ResourceHandlers
 from .prompt_handlers import PromptHandlers
+from .error_handler import (
+    retry_qdrant_operation,
+    retry_network_operation,
+    error_handler,
+    ErrorCategory,
+    ErrorSeverity
+)
 
 logger = get_logger("mcp-server")
 
@@ -59,6 +68,92 @@ class MemoryMCPServer:
         self.prompt_handlers = PromptHandlers(self.memory_manager)
         
         logger.info("Memory MCP Server initialized")
+
+    @retry_qdrant_operation(max_attempts=2)
+    def get_system_health(self) -> Dict[str, Any]:
+        """Get comprehensive system health information."""
+        health_info = {
+            "timestamp": str(datetime.now()),
+            "overall_status": "unknown",
+            "components": {},
+            "error_statistics": error_handler.get_error_stats(),
+            "memory_manager": {
+                "available": self.memory_manager is not None,
+                "collections_initialized": False
+            }
+        }
+        
+        try:
+            # Check Qdrant connection
+            if self.memory_manager and self.memory_manager.client:
+                try:
+                    collections = self.memory_manager.client.get_collections()
+                    health_info["components"]["qdrant"] = {
+                        "status": "healthy",
+                        "collections_count": len(collections.collections),
+                        "collections": [col.name for col in collections.collections]
+                    }
+                    health_info["memory_manager"]["collections_initialized"] = True
+                except Exception as e:
+                    health_info["components"]["qdrant"] = {
+                        "status": "unhealthy", 
+                        "error": str(e)
+                    }
+            else:
+                health_info["components"]["qdrant"] = {
+                    "status": "unavailable",
+                    "error": "Memory manager not initialized"
+                }
+            
+            # Check embedding model
+            if (self.memory_manager and 
+                self.memory_manager.embedding_model):
+                try:
+                    # Test embedding with a simple text
+                    test_embedding = self.memory_manager._embed_text("test")
+                    health_info["components"]["embedding_model"] = {
+                        "status": "healthy",
+                        "model_name": str(self.memory_manager.embedding_model),
+                        "embedding_dimension": len(test_embedding)
+                    }
+                except Exception as e:
+                    health_info["components"]["embedding_model"] = {
+                        "status": "unhealthy",
+                        "error": str(e)
+                    }
+            else:
+                health_info["components"]["embedding_model"] = {
+                    "status": "unavailable",
+                    "error": "Embedding model not loaded"
+                }
+            
+            # Check handlers
+            health_info["components"]["handlers"] = {
+                "tool_handlers": self.tool_handlers is not None,
+                "resource_handlers": self.resource_handlers is not None,
+                "prompt_handlers": self.prompt_handlers is not None
+            }
+            
+            # Determine overall status
+            component_statuses = [
+                comp.get("status", "unknown") 
+                for comp in health_info["components"].values() 
+                if isinstance(comp, dict) and "status" in comp
+            ]
+            
+            if all(status == "healthy" for status in component_statuses):
+                health_info["overall_status"] = "healthy"
+            elif any(status == "unhealthy" for status in component_statuses):
+                health_info["overall_status"] = "degraded"
+            else:
+                health_info["overall_status"] = "unavailable"
+                
+        except Exception as e:
+            logger.error(f"Error during health check: {e}")
+            health_info["overall_status"] = "error"
+            health_info["health_check_error"] = str(e)
+        
+        return health_info
 
     def get_available_tools(self) -> List[Dict[str, Any]]:
         """Get list of available memory management tools."""
@@ -724,6 +819,18 @@ class MemoryMCPServer:
                         }
                     },
                     "required": ["agent_id", "action", "outcome"]
+                }
+            },
+            {
+                "name": "system_health",
+                "description": (
+                    "Check system health and get diagnostic information "
+                    "about all components"
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
                 }
             }
         ]

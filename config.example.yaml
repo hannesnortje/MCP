@@ -1,0 +1,66 @@
+# MCP Memory Server Configuration
+# This file demonstrates the YAML configuration capabilities
+
+server:
+  name: "memory-server"
+  version: "1.0.0"
+  description: "Memory management server for AI agents using Qdrant vector database"
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: null  # Optional log file path
+
+qdrant:
+  mode: "local"  # local, remote, cloud
+  host: "localhost"
+  port: 6333
+  api_key: null  # Required for cloud mode
+  timeout: 60
+  
+  # Docker settings (for local mode)
+  docker_image: "qdrant/qdrant:latest"
+  container_name: "qdrant"
+  
+  # Timeouts
+  startup_timeout: 15
+  health_check_timeout: 5
+
+embedding:
+  model_name: "all-MiniLM-L6-v2"
+  dimension: 384
+  device: "cpu"  # or "cuda" for GPU acceleration
+  cache_folder: null
+
+markdown:
+  chunk_size: 900
+  chunk_overlap: 200
+  recursive_processing: true
+  
+  # AI enhancement settings
+  ai_enhancement_enabled: true
+  ai_analysis_depth: "standard"  # basic, standard, deep
+  ai_content_optimization: true
+
+policy:
+  directory: "./policy"
+  rule_id_pattern: "^[A-Z]+-\\d+$"
+  validation_strict: true
+  hash_algorithm: "sha256"
+
+memory:
+  type_confidence_threshold: 0.6
+  suggestion_enabled: true
+
+deduplication:
+  similarity_threshold: 0.85
+  near_miss_threshold: 0.80
+  logging_enabled: true
+  diagnostics_enabled: true
+
+error_handling:
+  retry_attempts: 3
+  base_delay: 1.0
+  max_delay: 30.0
+  exponential_base: 2.0
+  jitter_enabled: true

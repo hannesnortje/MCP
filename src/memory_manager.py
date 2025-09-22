@@ -1,6 +1,7 @@
 """
 Qdrant Memory Manager for MCP Memory Server.
 Handles vector database operations for different memory types.
+Enhanced with production-grade error handling and retry logic.
 """
 
 import logging
@@ -20,6 +21,12 @@ from src.server_config import (
     DEDUPLICATION_LOGGING_ENABLED,
     DEDUPLICATION_DIAGNOSTICS_ENABLED
 )
+from .error_handler import (
+    retry_qdrant_operation,
+    retry_embedding_operation,
+    retry_network_operation,
+    error_handler
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +45,7 @@ class QdrantMemoryManager:
         # Initialize synchronously for MCP server compatibility
         self._sync_initialize()
 
+    @retry_qdrant_operation(max_attempts=3)
     def _sync_initialize(self) -> None:
         """Synchronous initialization for compatibility."""
         try:
@@ -72,6 +80,7 @@ class QdrantMemoryManager:
             logger.error(f"❌ Failed to initialize Qdrant: {e}")
             raise
 
+    @retry_qdrant_operation(max_attempts=3)
     def _sync_initialize_collections(self) -> None:
         """Initialize required collections synchronously."""
         try:
@@ -426,6 +435,7 @@ class QdrantMemoryManager:
         uuid_str = f"{hash_hex[:8]}-{hash_hex[8:12]}-{hash_hex[12:16]}-{hash_hex[16:20]}-{hash_hex[20:32]}"
         return uuid_str
 
+    @retry_embedding_operation(max_attempts=2)
     def _embed_text(self, text: str) -> List[float]:
         """Generate embedding for text."""
         if not self.embedding_model:
