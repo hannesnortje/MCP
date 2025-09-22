@@ -28,6 +28,7 @@ class Config:
     GLOBAL_MEMORY_COLLECTION: str = "global_memory"
     LEARNED_MEMORY_COLLECTION: str = "learned_memory" 
     AGENT_MEMORY_COLLECTION: str = "agent_specific_memory"
+    FILE_METADATA_COLLECTION: str = "file_metadata"
 
     # Agent Configuration
     DEFAULT_AGENT_ID: str = os.getenv("DEFAULT_AGENT_ID", "default")

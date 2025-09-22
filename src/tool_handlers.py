@@ -5,6 +5,7 @@ Contains the actual logic for each tool, separated from MCP protocol handling.
 
 from typing import Dict, Any
 import asyncio
+from datetime import datetime
 
 from .server_config import get_logger
 from .markdown_processor import MarkdownProcessor
@@ -466,6 +467,367 @@ class ToolHandlers:
                 ]
             }
 
+    async def handle_process_markdown_file(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Handle process_markdown_file tool call - complete end-to-end pipeline."""
+        try:
+            file_path = arguments.get("path", "")
+            memory_type = arguments.get("memory_type")
+            auto_suggest = arguments.get("auto_suggest", True)
+            agent_id = arguments.get("agent_id")
+            
+            if not file_path.strip():
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "File path cannot be empty"}
+                    ]
+                }
+            
+            # Step 1: Read and validate file
+            try:
+                content = await self.markdown_processor.read_file(file_path)
+                if not content.strip():
+                    return {
+                        "isError": True,
+                        "content": [
+                            {"type": "text", "text": f"File is empty: {file_path}"}
+                        ]
+                    }
+            except FileNotFoundError:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": f"File not found: {file_path}"}
+                    ]
+                }
+            
+            # Step 2: Check if already processed (skip if identical)
+            file_hash = self.markdown_processor.calculate_content_hash(content)
+            if self.memory_manager.check_file_processed(file_path, file_hash):
+                return {
+                    "content": [
+                        {"type": "text", 
+                         "text": f"File already processed: {file_path} (hash: {file_hash[:8]}...)"}
+                    ]
+                }
+            
+            # Step 3: Analyze content and determine memory type
+            if auto_suggest and not memory_type:
+                analysis = await self.markdown_processor.analyze_content_for_memory_type(
+                    content, suggest_memory_type=True, ai_enhance=True
+                )
+                memory_type = analysis["suggested_memory_type"]
+                suggestion_reason = analysis["suggestion_reasoning"]
+            else:
+                suggestion_reason = "User specified" if memory_type else "Default to global"
+                memory_type = memory_type or "global"
+            
+            # Step 4: Optimize content for storage
+            optimized_content = await self.markdown_processor.optimize_content_for_storage(
+                content, memory_type, ai_optimization=True
+            )
+            
+            # Step 5: Chunk content
+            chunks = self.markdown_processor.chunk_content(optimized_content)
+            
+            # Step 6: Process chunks with deduplication and storage
+            chunk_results = []
+            stored_chunks = []
+            
+            for i, chunk in enumerate(chunks):
+                chunk_text = chunk["text"]
+                
+                # Check for duplicates
+                duplicate_check = self.memory_manager.async_check_duplicate_with_similarity(
+                    content=chunk_text,
+                    memory_type=memory_type,
+                    agent_id=agent_id,
+                    enable_near_miss=True
+                )
+                
+                if duplicate_check["is_duplicate"]:
+                    chunk_results.append({
+                        "chunk_index": i,
+                        "action": "skipped_duplicate",
+                        "similarity_score": duplicate_check["similarity_score"],
+                        "reason": "Content already exists in memory"
+                    })
+                    continue
+                elif duplicate_check["is_near_miss"]:
+                    chunk_results.append({
+                        "chunk_index": i,
+                        "action": "stored_near_miss",
+                        "similarity_score": duplicate_check["similarity_score"],
+                        "reason": "Similar content exists but stored anyway"
+                    })
+                
+                # Store chunk in memory
+                chunk_hash = self.memory_manager.async_add_to_memory(
+                    content=chunk_text,
+                    memory_type=memory_type,
+                    agent_id=agent_id,
+                    metadata={
+                        "source_file": file_path,
+                        "chunk_index": i,
+                        "total_chunks": len(chunks),
+                        "file_hash": file_hash,
+                        "processing_timestamp": datetime.now().isoformat()
+                    }
+                )
+                
+                stored_chunks.append(chunk_hash)
+                chunk_results.append({
+                    "chunk_index": i,
+                    "action": "stored",
+                    "chunk_hash": chunk_hash,
+                    "reason": "Successfully stored in memory"
+                })
+            
+            # Step 7: Record file metadata
+            processing_info = {
+                "memory_type": memory_type,
+                "suggestion_reason": suggestion_reason,
+                "total_chunks": len(chunks),
+                "stored_chunks": len(stored_chunks),
+                "skipped_chunks": len(chunk_results) - len(stored_chunks),
+                "agent_id": agent_id
+            }
+            
+            self.memory_manager.add_file_metadata(
+                file_path=file_path,
+                file_hash=file_hash,
+                chunk_ids=stored_chunks,
+                processing_info=processing_info
+            )
+            
+            # Format response
+            response_text = (
+                f"File Processing Complete: {file_path}\n\n"
+                f"📋 Processing Summary:\n"
+                f"• Memory Type: {memory_type} ({suggestion_reason})\n"
+                f"• File Hash: {file_hash}\n"
+                f"• Total Chunks: {len(chunks)}\n"
+                f"• Stored Chunks: {len(stored_chunks)}\n"
+                f"• Skipped (Duplicates): {len(chunk_results) - len(stored_chunks)}\n"
+            )
+            
+            if agent_id:
+                response_text += f"• Agent Context: {agent_id}\n"
+            
+            response_text += f"\n📊 Chunk Processing Details:\n"
+            for result in chunk_results:
+                action_emoji = {
+                    "stored": "✅",
+                    "skipped_duplicate": "⏭️",
+                    "stored_near_miss": "⚠️"
+                }.get(result["action"], "❓")
+                
+                response_text += f"{action_emoji} Chunk {result['chunk_index']}: {result['action']}"
+                if "similarity_score" in result:
+                    response_text += f" (similarity: {result['similarity_score']:.3f})"
+                response_text += f" - {result['reason']}\n"
+            
+            return {
+                "content": [{"type": "text", "text": response_text}]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in process_markdown_file: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", 
+                     "text": f"Failed to process file: {str(e)}"}
+                ]
+            }
+
+    async def handle_batch_process_markdown_files(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Handle batch processing of specific markdown files."""
+        try:
+            file_assignments = arguments.get("file_assignments", [])
+            default_memory_type = arguments.get("default_memory_type")
+            
+            if not file_assignments:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "No file assignments provided"}
+                    ]
+                }
+            
+            results = {
+                "processed_files": [],
+                "failed_files": [],
+                "total_files": len(file_assignments),
+                "total_chunks_stored": 0,
+                "total_chunks_skipped": 0
+            }
+            
+            for assignment in file_assignments:
+                file_path = assignment.get("path", "")
+                memory_type = assignment.get("memory_type", default_memory_type)
+                agent_id = assignment.get("agent_id")
+                
+                if not file_path:
+                    results["failed_files"].append({
+                        "path": "unknown",
+                        "error": "No file path provided in assignment"
+                    })
+                    continue
+                
+                # Process individual file
+                try:
+                    file_result = await self.handle_process_markdown_file({
+                        "path": file_path,
+                        "memory_type": memory_type,
+                        "auto_suggest": memory_type is None,
+                        "agent_id": agent_id
+                    })
+                    
+                    if file_result.get("isError"):
+                        results["failed_files"].append({
+                            "path": file_path,
+                            "error": file_result["content"][0]["text"]
+                        })
+                    else:
+                        # Parse success result to extract metrics
+                        response_text = file_result["content"][0]["text"]
+                        
+                        # Extract stored/skipped counts from response
+                        stored_chunks = 0
+                        skipped_chunks = 0
+                        if "Stored Chunks:" in response_text:
+                            lines = response_text.split('\n')
+                            for line in lines:
+                                if "Stored Chunks:" in line:
+                                    stored_chunks = int(line.split(':')[1].strip())
+                                elif "Skipped (Duplicates):" in line:
+                                    skipped_chunks = int(line.split(':')[1].strip())
+                        
+                        results["processed_files"].append({
+                            "path": file_path,
+                            "memory_type": memory_type,
+                            "stored_chunks": stored_chunks,
+                            "skipped_chunks": skipped_chunks
+                        })
+                        
+                        results["total_chunks_stored"] += stored_chunks
+                        results["total_chunks_skipped"] += skipped_chunks
+                        
+                except Exception as e:
+                    results["failed_files"].append({
+                        "path": file_path,
+                        "error": str(e)
+                    })
+            
+            # Format response
+            processed = len(results["processed_files"])
+            failed = len(results["failed_files"])
+            
+            response_text = (
+                f"Batch File Processing Complete\n\n"
+                f"📋 Summary:\n"
+                f"• Total files: {results['total_files']}\n"
+                f"• Successfully processed: {processed}\n"
+                f"• Failed: {failed}\n"
+                f"• Total chunks stored: {results['total_chunks_stored']}\n"
+                f"• Total chunks skipped: {results['total_chunks_skipped']}\n\n"
+            )
+            
+            if processed > 0:
+                response_text += "✅ Successfully Processed:\n"
+                for file_info in results["processed_files"]:
+                    response_text += (
+                        f"• {file_info['path']} → {file_info['memory_type']} "
+                        f"({file_info['stored_chunks']} stored, "
+                        f"{file_info['skipped_chunks']} skipped)\n"
+                    )
+                response_text += "\n"
+            
+            if failed > 0:
+                response_text += "❌ Failed Files:\n"
+                for file_info in results["failed_files"]:
+                    response_text += f"• {file_info['path']}: {file_info['error']}\n"
+            
+            return {
+                "content": [{"type": "text", "text": response_text}]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in batch_process_markdown_files: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", 
+                     "text": f"Failed to batch process files: {str(e)}"}
+                ]
+            }
+
+    async def handle_batch_process_directory(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Handle complete directory processing with end-to-end pipeline."""
+        try:
+            directory = arguments.get("directory", "./")
+            memory_type = arguments.get("memory_type")
+            recursive = arguments.get("recursive", True)
+            agent_id = arguments.get("agent_id")
+            
+            # Step 1: Discover markdown files
+            discovered_files = await self.markdown_processor.scan_directory_for_markdown(
+                directory, recursive=recursive
+            )
+            
+            if not discovered_files["files"]:
+                return {
+                    "content": [
+                        {"type": "text", 
+                         "text": f"No markdown files found in {directory}"}
+                    ]
+                }
+            
+            # Step 2: Process each file through complete pipeline
+            file_assignments = []
+            for file_info in discovered_files["files"]:
+                file_assignments.append({
+                    "path": file_info["path"],
+                    "memory_type": memory_type,
+                    "agent_id": agent_id
+                })
+            
+            # Use batch processing tool
+            batch_result = await self.handle_batch_process_markdown_files({
+                "file_assignments": file_assignments,
+                "default_memory_type": memory_type
+            })
+            
+            # Enhance response with directory context
+            if not batch_result.get("isError"):
+                original_text = batch_result["content"][0]["text"]
+                enhanced_text = (
+                    f"Directory Processing Complete: {directory}\n"
+                    f"📂 Directory: {directory} ({'recursive' if recursive else 'non-recursive'})\n"
+                    f"🔍 Files discovered: {len(discovered_files['files'])}\n\n"
+                    f"{original_text}"
+                )
+                batch_result["content"][0]["text"] = enhanced_text
+            
+            return batch_result
+            
+        except Exception as e:
+            logger.error(f"Error in batch_process_directory: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", 
+                     "text": f"Failed to process directory: {str(e)}"}
+                ]
+            }
+
     async def handle_tool_call(
         self, tool_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -496,6 +858,10 @@ class ToolHandlers:
                 "process_markdown_directory": self.handle_process_markdown_directory,
                 # Enhanced deduplication tool
                 "validate_and_deduplicate": self.handle_validate_and_deduplicate,
+                # Complete ingestion pipeline tools
+                "process_markdown_file": self.handle_process_markdown_file,
+                "batch_process_markdown_files": self.handle_batch_process_markdown_files,
+                "batch_process_directory": self.handle_batch_process_directory,
             }
             
             if tool_name in handler_map:

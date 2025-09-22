@@ -78,6 +78,7 @@ class QdrantMemoryManager:
             collections_to_create = [
                 Config.GLOBAL_MEMORY_COLLECTION,
                 Config.LEARNED_MEMORY_COLLECTION,
+                Config.FILE_METADATA_COLLECTION,
             ]
 
             existing_collections = {
@@ -360,6 +361,7 @@ class QdrantMemoryManager:
             collections_to_create = [
                 Config.GLOBAL_MEMORY_COLLECTION,
                 Config.LEARNED_MEMORY_COLLECTION,
+                Config.FILE_METADATA_COLLECTION,
             ]
 
             existing_collections = {
@@ -715,6 +717,82 @@ class QdrantMemoryManager:
         except Exception as e:
             logger.error(f"❌ Failed to check for duplicates: {e}")
             return False
+
+    def add_file_metadata(
+        self,
+        file_path: str,
+        file_hash: str,
+        chunk_ids: List[str],
+        processing_info: Dict[str, Any]
+    ) -> bool:
+        """Add file metadata to track processing history."""
+        if not self.client:
+            raise RuntimeError("Qdrant client not initialized")
+
+        try:
+            # Create metadata record
+            metadata = {
+                "file_path": file_path,
+                "file_hash": file_hash,
+                "chunk_ids": chunk_ids,
+                "chunk_count": len(chunk_ids),
+                "processed_timestamp": datetime.now().isoformat(),
+                **processing_info
+            }
+
+            # Use file hash as ID for deduplication
+            point = PointStruct(
+                id=file_hash,
+                vector=[0.0] * Config.EMBEDDING_DIMENSION,  # Dummy vector
+                payload=metadata
+            )
+
+            self.client.upsert(
+                collection_name=Config.FILE_METADATA_COLLECTION,
+                points=[point]
+            )
+
+            logger.info(f"📄 Added file metadata: {file_path}")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Failed to add file metadata: {e}")
+            return False
+
+    def get_file_metadata(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """Get metadata for a specific file."""
+        if not self.client:
+            raise RuntimeError("Qdrant client not initialized")
+
+        try:
+            # Search by file path
+            search_results = self.client.scroll(
+                collection_name=Config.FILE_METADATA_COLLECTION,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="file_path",
+                            match=models.MatchValue(value=file_path)
+                        )
+                    ]
+                ),
+                limit=1
+            )
+
+            if search_results[0]:  # [0] is points, [1] is next_page_offset
+                return search_results[0][0].payload
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Failed to get file metadata: {e}")
+            return None
+
+    def check_file_processed(self, file_path: str, file_hash: str) -> bool:
+        """Check if file has been processed with current content."""
+        metadata = self.get_file_metadata(file_path)
+        if metadata:
+            return metadata.get("file_hash") == file_hash
+        return False
 
     def async_delete_content(
         self,
