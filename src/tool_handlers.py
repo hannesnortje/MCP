@@ -1708,6 +1708,8 @@ class ToolHandlers:
                 "compare_against_learned_memory": (
                     self.handle_compare_against_learned_memory
                 ),
+                # System health and diagnostics
+                "system_health": self.handle_system_health,
                 # New markdown processing tools
                 "scan_workspace_markdown": self.handle_scan_workspace_markdown,
                 "analyze_markdown_content": self.handle_analyze_markdown_content,

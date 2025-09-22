@@ -959,12 +959,17 @@ class MemoryMCPServer:
                     }
                 }
             
-            # Format successful response
+            # Format successful response - MCP requires 'contents' array
+            resource_data = result.get('data', {})
+            
+            # Convert the data to a properly formatted JSON string
+            json_text = json.dumps(resource_data, indent=2, ensure_ascii=False)
+            
             return {
                 "contents": [{
                     "uri": uri,
                     "mimeType": "application/json",
-                    "text": json.dumps(result.get('data', {}), indent=2)
+                    "text": json_text
                 }]
             }
             
@@ -1089,7 +1094,11 @@ async def run_mcp_server():
             
             if method == "initialize":
                 send_response(request_id, init_response)
-                send_notification("initialized")
+                # Don't send notification immediately - wait for client's initialized notification
+                logger.info("Memory server initialization response sent")
+                
+            elif method == "notifications/initialized":
+                # Client has confirmed initialization is complete
                 logger.info("Memory server initialized successfully")
                 
             elif method == "tools/list":
@@ -1113,7 +1122,9 @@ async def run_mcp_server():
                     send_response(request_id, error_response)
                 else:
                     params = data.get("params", {})
-                    result = await server.handle_resource_read(uri, params)
+                    # Remove uri from params to avoid duplicate
+                    params_clean = {k: v for k, v in params.items() if k != 'uri'}
+                    result = await server.handle_resource_read(uri, params_clean)
                     send_response(request_id, result)
                 
             elif method == "prompts/list":
