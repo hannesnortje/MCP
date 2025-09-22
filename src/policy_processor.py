@@ -37,7 +37,16 @@ class PolicyProcessor:
         try:
             # Handle directory resolution more robustly
             if directory:
-                policy_dir = Path(directory)
+                provided_dir = Path(directory)
+                # If it's an absolute path, use it directly
+                if provided_dir.is_absolute():
+                    policy_dir = provided_dir
+                else:
+                    # For relative paths, resolve relative to project root
+                    current_file = Path(__file__)
+                    # Go up from src/ to project root
+                    project_root = current_file.parent.parent
+                    policy_dir = project_root / provided_dir
             else:
                 # Try to find project root from this file's location
                 current_file = Path(__file__)
