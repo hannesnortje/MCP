@@ -35,12 +35,24 @@ class Config:
     AGENT_MEMORY_COLLECTION: str = "agent_specific_memory"
     FILE_METADATA_COLLECTION: str = "file_metadata"
     AGENT_REGISTRY_COLLECTION: str = "agent_registry"
+    POLICY_MEMORY_COLLECTION: str = "policy_memory"
+    POLICY_VIOLATIONS_COLLECTION: str = "policy_violations"
 
     # Agent Configuration
     DEFAULT_AGENT_ID: str = os.getenv("DEFAULT_AGENT_ID", "default")
 
     # Server Configuration
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
+    # Policy Configuration
+    POLICY_DIRECTORY: str = os.getenv("POLICY_DIRECTORY", "./policy")
+    POLICY_RULE_ID_PATTERN: str = r"\[([A-Z]-\d{3})\]"  # [P-001] format
+    POLICY_REQUIRED_SECTIONS: list = [
+        "Principles",
+        "Forbidden Actions",
+        "Required Sections",
+        "Style Guide"
+    ]
 
     @classmethod
     def get_collection_name(
@@ -66,3 +78,6 @@ GLOBAL_MEMORY_COLLECTION = Config.GLOBAL_MEMORY_COLLECTION
 LEARNED_MEMORY_COLLECTION = Config.LEARNED_MEMORY_COLLECTION
 AGENT_MEMORY_COLLECTION = Config.AGENT_MEMORY_COLLECTION
 AGENT_REGISTRY_COLLECTION = Config.AGENT_REGISTRY_COLLECTION
+FILE_METADATA_COLLECTION = Config.FILE_METADATA_COLLECTION
+POLICY_MEMORY_COLLECTION = Config.POLICY_MEMORY_COLLECTION
+POLICY_VIOLATIONS_COLLECTION = Config.POLICY_VIOLATIONS_COLLECTION

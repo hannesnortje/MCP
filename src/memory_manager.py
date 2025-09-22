@@ -89,6 +89,8 @@ class QdrantMemoryManager:
                 Config.LEARNED_MEMORY_COLLECTION,
                 Config.FILE_METADATA_COLLECTION,
                 Config.AGENT_REGISTRY_COLLECTION,
+                Config.POLICY_MEMORY_COLLECTION,
+                Config.POLICY_VIOLATIONS_COLLECTION,
             ]
 
             existing_collections = {

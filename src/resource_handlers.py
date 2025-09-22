@@ -95,6 +95,24 @@ class ResourceHandlers:
                 ),
                 'mimeType': 'application/json',
                 'uri': 'memory://policy_catalog'
+            },
+            'policy_violations_log': {
+                'name': 'policy_violations_log',
+                'description': (
+                    'Log of policy violations with agent attribution '
+                    'and context'
+                ),
+                'mimeType': 'application/json',
+                'uri': 'memory://policy_violations_log'
+            },
+            'policy_rulebook': {
+                'name': 'policy_rulebook',
+                'description': (
+                    'Complete policy rulebook in canonical JSON format '
+                    'with all active rules'
+                ),
+                'mimeType': 'application/json',
+                'uri': 'memory://policy_rulebook'
             }
         }
     
@@ -138,6 +156,10 @@ class ResourceHandlers:
                 return await self._get_system_configuration(**kwargs)
             elif resource_path == 'policy_catalog':
                 return await self._get_policy_catalog(**kwargs)
+            elif resource_path == 'policy_violations_log':
+                return await self._get_policy_violations_log(**kwargs)
+            elif resource_path == 'policy_rulebook':
+                return await self._get_policy_rulebook(**kwargs)
             else:
                 return {
                     'error': f"Unknown resource: {resource_path}",
@@ -791,5 +813,161 @@ class ResourceHandlers:
             logger.error(f"Error getting policy catalog: {e}")
             return {
                 'error': f"Failed to get policy catalog: {str(e)}",
+                'status': 'error'
+            }
+
+    async def _get_policy_violations_log(self, limit: int = 100, offset: int = 0, **kwargs) -> Dict[str, Any]:
+        """Get policy violations log with pagination."""
+        try:
+            from .config import Config
+            
+            # Query policy violations collection
+            violations_data = []
+            
+            try:
+                # Create dummy query vector for all violations
+                query_vector = [0.0] * Config.EMBEDDING_DIMENSION
+                
+                # Search policy violations collection
+                results = self.memory_manager.client.search(
+                    collection_name=Config.POLICY_VIOLATIONS_COLLECTION,
+                    query_vector=query_vector,
+                    limit=min(limit, 1000),
+                    offset=offset,
+                    with_payload=True
+                )
+                
+                violations_data = [
+                    {
+                        'violation_id': result.id,
+                        'agent_id': result.payload.get('agent_id', 'unknown'),
+                        'rule_id': result.payload.get('rule_id', 'unknown'),
+                        'severity': result.payload.get('severity', 'medium'),
+                        'timestamp': result.payload.get('timestamp', 'unknown'),
+                        'context': result.payload.get('context', {})
+                    }
+                    for result in results
+                ]
+                
+            except Exception as e:
+                logger.warning(f"Could not query policy violations: {e}")
+                violations_data = []
+            
+            return {
+                'resource': 'policy_violations_log',
+                'data': {
+                    'violations': violations_data,
+                    'total_violations': len(violations_data),
+                    'pagination': {
+                        'limit': limit,
+                        'offset': offset,
+                        'has_more': len(violations_data) == limit
+                    },
+                    'timestamp': datetime.utcnow().isoformat()
+                },
+                'status': 'success'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting policy violations log: {e}")
+            return {
+                'error': f"Failed to get policy violations log: {str(e)}",
+                'status': 'error'
+            }
+
+    async def _get_policy_rulebook(self, version: str = "latest", **kwargs) -> Dict[str, Any]:
+        """Get the complete policy rulebook in canonical JSON format."""
+        try:
+            from .config import Config
+            
+            policy_entries = []
+            
+            try:
+                # Create dummy query vector for all policies
+                query_vector = [0.0] * Config.EMBEDDING_DIMENSION
+                
+                # Search with filter for version if not "latest"
+                filter_condition = None
+                if version != "latest":
+                    filter_condition = {
+                        "must": [{"key": "policy_version", "match": {"value": version}}]
+                    }
+                
+                # Search policy memory collection
+                results = self.memory_manager.client.search(
+                    collection_name=Config.POLICY_MEMORY_COLLECTION,
+                    query_vector=query_vector,
+                    query_filter=filter_condition,
+                    limit=1000,
+                    with_payload=True
+                )
+                
+                policy_entries = [result.payload for result in results]
+                
+            except Exception as e:
+                logger.warning(f"Could not query policy memory: {e}")
+                policy_entries = []
+            
+            if not policy_entries:
+                return {
+                    'resource': 'policy_rulebook',
+                    'data': {
+                        'message': f'No policy found for version: {version}',
+                        'available': False,
+                        'timestamp': datetime.utcnow().isoformat()
+                    },
+                    'status': 'success'
+                }
+            
+            # Build structured rulebook
+            sections = {}
+            policy_hash = None
+            policy_version_actual = version
+            
+            for entry in policy_entries:
+                section_name = entry.get("section", "Unknown")
+                if section_name not in sections:
+                    sections[section_name] = []
+                
+                sections[section_name].append({
+                    "rule_id": entry["rule_id"],
+                    "text": entry["text"],
+                    "severity": entry.get("severity", "medium"),
+                    "line_number": entry.get("line_number"),
+                    "source_path": entry.get("source_path")
+                })
+                
+                # Get policy hash and version from first entry
+                if policy_hash is None:
+                    policy_hash = entry.get("policy_hash", "unknown")
+                    policy_version_actual = entry.get("policy_version", version)
+            
+            # Create canonical rulebook
+            rulebook = {
+                "policy_version": policy_version_actual,
+                "policy_hash": policy_hash,
+                "sections": sections,
+                "total_rules": len(policy_entries),
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            return {
+                'resource': 'policy_rulebook',
+                'data': {
+                    'rulebook': rulebook,
+                    'available': True,
+                    'version': policy_version_actual,
+                    'hash': policy_hash,
+                    'total_rules': len(policy_entries),
+                    'sections_count': len(sections),
+                    'timestamp': datetime.utcnow().isoformat()
+                },
+                'status': 'success'
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting policy rulebook: {e}")
+            return {
+                'error': f"Failed to get policy rulebook: {str(e)}",
                 'status': 'error'
             }
