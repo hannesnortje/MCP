@@ -49,6 +49,15 @@ class MemoryAdapter:
         self.reverse_mapping = {
             v: k for k, v in self.collection_mapping.items()
         }
+        
+        # Log server connection mode
+        if server_connection:
+            conn_type = server_connection.get('type', 'unknown')
+            server_mode = server_connection.get('server_mode', 'unknown')
+            logger.info(
+                f"Memory adapter initialized for {conn_type} "
+                f"connection to server mode: {server_mode}"
+            )
     
     async def initialize(self) -> bool:
         """Initialize the connection to the memory manager.
@@ -59,12 +68,20 @@ class MemoryAdapter:
         try:
             # Use an executor to run the potentially blocking initialization
             # in a separate thread to avoid blocking the UI
-            if self.server_connection:
-                # Connect to existing memory manager (future implementation)
+            is_direct = (self.server_connection and
+                         self.server_connection.get('type') == 'direct')
+            
+            if is_direct:
+                # Connect to existing memory manager in direct mode
                 logger.info("Connecting to existing memory manager...")
                 
-                # Currently, we don't have a mechanism to connect to an
-                # existing memory manager process, so we'll create a new one
+                # Get the parent process ID
+                server_pid = self.server_connection.get('pid')
+                if not server_pid:
+                    logger.warning("No server PID provided in connection info")
+                
+                # In direct mode, we create a new memory manager instance
+                # that connects to the same Qdrant instance as the server
                 loop = asyncio.get_event_loop()
                 self.memory_manager = await loop.run_in_executor(
                     self._executor, QdrantMemoryManager

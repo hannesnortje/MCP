@@ -7,6 +7,9 @@ import sys
 import logging
 import asyncio
 import signal
+import argparse
+import json
+import os
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer, QEventLoop
 
@@ -22,13 +25,54 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def init_memory_adapter():
+def parse_arguments():
+    """Parse command-line arguments for UI configuration."""
+    parser = argparse.ArgumentParser(
+        description="MCP Memory Server UI - Memory visualization and management"
+    )
+    
+    parser.add_argument(
+        "--connection-file",
+        help="Path to connection info file for direct server connection"
+    )
+    
+    return parser.parse_args()
+
+
+def load_connection_info(file_path):
+    """Load server connection info from file.
+    
+    Args:
+        file_path: Path to the connection info file.
+        
+    Returns:
+        Dictionary with connection info or None if failed.
+    """
+    try:
+        if not os.path.exists(file_path):
+            logger.error(f"Connection file not found: {file_path}")
+            return None
+        
+        with open(file_path, 'r') as f:
+            connection_info = json.load(f)
+        
+        logger.info(f"Loaded connection info from {file_path}")
+        return connection_info
+    except Exception as e:
+        logger.error(f"Failed to load connection info: {e}")
+        return None
+
+
+async def init_memory_adapter(connection_info=None):
     """Initialize the memory adapter.
     
+    Args:
+        connection_info: Optional connection info for direct connection.
+        
     Returns:
         Initialized memory adapter.
     """
-    adapter = MemoryAdapter()
+    adapter = MemoryAdapter(server_connection=connection_info)
     success = await adapter.initialize()
     if not success:
         logger.warning("Failed to initialize memory adapter.")
@@ -37,6 +81,14 @@ async def init_memory_adapter():
 
 async def async_main():
     """Async entry point for the application."""
+    # Parse command-line arguments
+    args = parse_arguments()
+    
+    # Load connection info if provided
+    connection_info = None
+    if args.connection_file:
+        connection_info = load_connection_info(args.connection_file)
+    
     # Create application
     app = QApplication(sys.argv)
     app.setApplicationName("MCP Memory Server")
@@ -53,7 +105,7 @@ async def async_main():
     window.show()
     
     # Initialize memory adapter
-    adapter = await init_memory_adapter()
+    adapter = await init_memory_adapter(connection_info)
     window.initialize_with_adapter(adapter)
     
     # Create timer to process asyncio events

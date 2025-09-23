@@ -8,12 +8,20 @@ Supports three server modes:
 - Full mode: Both prompts and tools (default)
 - Prompts-only mode: Only prompts exposed (best for Cursor)
 - Tools-only mode: Only tools exposed (best for programmatic use)
+
+Can also launch a UI for memory visualization and management.
 """
 
 import sys
 import asyncio
 import argparse
 import os
+import subprocess
+import atexit
+import signal
+import json
+import tempfile
+from pathlib import Path
 
 from src.server_config import get_logger
 from src.mcp_server import run_mcp_server
@@ -34,11 +42,18 @@ Server Modes:
   prompts-only      Only prompts exposed (best for Cursor)
   tools-only        Only tools exposed (best for programmatic use)
 
+UI Options:
+  --ui              Launch with UI for memory visualization and management
+  --ui-only         Launch only the UI without the server (connect to existing)
+
 Examples:
   python memory_server.py                    # Full mode
-  python memory_server.py --prompts-only    # Prompts-only mode
-  python memory_server.py --tools-only      # Tools-only mode
-  TOOLS_ONLY=1 python memory_server.py      # Tools-only via env var
+  python memory_server.py --prompts-only     # Prompts-only mode
+  python memory_server.py --tools-only       # Tools-only mode
+  python memory_server.py --ui               # Full mode with UI
+  python memory_server.py --ui-only          # UI only (no server)
+  TOOLS_ONLY=1 python memory_server.py       # Tools-only via env var
+  UI=1 python memory_server.py               # UI via env var
         """
     )
     
@@ -57,6 +72,19 @@ Examples:
         "--full",
         action="store_true",
         help="Run server in full mode with both prompts and tools (default)"
+    )
+    
+    # UI options
+    ui_group = parser.add_mutually_exclusive_group()
+    ui_group.add_argument(
+        "--ui",
+        action="store_true",
+        help="Launch with UI for memory visualization and management"
+    )
+    ui_group.add_argument(
+        "--ui-only",
+        action="store_true",
+        help="Launch only the UI without the server (connect to existing)"
     )
     
     return parser.parse_args()
@@ -82,11 +110,111 @@ def determine_server_mode(args):
     return "full"
 
 
+def should_launch_ui(args):
+    """Determine if UI should be launched based on arguments and env vars."""
+    # Check environment variables first
+    if os.getenv("UI", "").lower() in ("1", "true", "yes"):
+        return True
+    if os.getenv("UI_ONLY", "").lower() in ("1", "true", "yes"):
+        return "ui-only"
+    
+    # Check command line arguments
+    if args.ui:
+        return True
+    if args.ui_only:
+        return "ui-only"
+    
+    # Default: no UI
+    return False
+
+
+def launch_ui(server_info=None):
+    """Launch the UI as a subprocess.
+    
+    Args:
+        server_info: Optional server connection info for direct connection.
+        
+    Returns:
+        Subprocess object for the UI process.
+    """
+    logger.info("Launching memory server UI...")
+    
+    # Create a temporary file with server connection info if provided
+    connection_file = None
+    if server_info:
+        connection_file = tempfile.NamedTemporaryFile(
+            mode='w+', suffix='.json', delete=False
+        )
+        json.dump(server_info, connection_file)
+        connection_file.close()
+        logger.debug(f"Created connection file at {connection_file.name}")
+    
+    # Build command to launch UI
+    cmd = [sys.executable, "-m", "src.ui.main"]
+    if connection_file:
+        cmd.extend(["--connection-file", connection_file.name])
+    
+    # Launch UI subprocess
+    try:
+        # Use DETACHED_PROCESS on Windows to avoid console window
+        if sys.platform == 'win32':
+            creationflags = subprocess.DETACHED_PROCESS
+        else:
+            creationflags = 0
+        
+        ui_process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            creationflags=creationflags,
+            text=True
+        )
+        
+        # Log subprocess ID
+        logger.info(f"UI process launched with PID {ui_process.pid}")
+        
+        # Set up cleanup for connection file
+        if connection_file:
+            def cleanup_connection_file():
+                try:
+                    os.unlink(connection_file.name)
+                    logger.debug(
+                        f"Removed connection file {connection_file.name}"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to remove connection file: {e}")
+            
+            atexit.register(cleanup_connection_file)
+        
+        return ui_process
+    except Exception as e:
+        logger.error(f"Failed to launch UI: {e}")
+        if connection_file:
+            try:
+                os.unlink(connection_file.name)
+            except Exception:
+                pass
+        return None
+
+
 def main():
     """Main entry point for the Memory MCP Server."""
+    ui_process = None
+    
     try:
         args = parse_arguments()
         server_mode = determine_server_mode(args)
+        ui_option = should_launch_ui(args)
+        
+        # Handle UI-only mode
+        if ui_option == "ui-only":
+            logger.info("Starting in UI-only mode (no server)...")
+            ui_process = launch_ui()
+            
+            # Wait for UI process to complete
+            if ui_process:
+                ui_process.wait()
+            return
         
         # Log server mode
         mode_messages = {
@@ -102,6 +230,45 @@ def main():
         }
         logger.info(mode_messages[server_mode])
         
+        # Launch UI if requested
+        if ui_option:
+            # Create server info for UI
+            server_info = {
+                "type": "direct",
+                "server_mode": server_mode,
+                "pid": os.getpid()
+            }
+            ui_process = launch_ui(server_info)
+        
+        # Define cleanup function for UI process
+        def cleanup_ui():
+            if ui_process:
+                logger.info("Shutting down UI process...")
+                try:
+                    if sys.platform == 'win32':
+                        # Windows requires different termination approach
+                        ui_process.terminate()
+                    else:
+                        # Send SIGTERM on Unix
+                        os.kill(ui_process.pid, signal.SIGTERM)
+                    
+                    # Give it a moment to shut down gracefully
+                    ui_process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    logger.warning(
+                        "UI didn't shut down gracefully, forcing..."
+                    )
+                    if sys.platform == 'win32':
+                        ui_process.kill()
+                    else:
+                        os.kill(ui_process.pid, signal.SIGKILL)
+                except Exception as e:
+                    logger.error(f"Error shutting down UI: {e}")
+        
+        # Register cleanup function
+        atexit.register(cleanup_ui)
+        
+        # Run the MCP server
         asyncio.run(run_mcp_server(server_mode))
     except KeyboardInterrupt:
         logger.info("Memory server interrupted")
