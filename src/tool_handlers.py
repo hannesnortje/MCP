@@ -118,8 +118,19 @@ class ToolHandlers:
         limit = arguments.get("limit", 10)
         min_score = arguments.get("min_score", 0.3)
         
+        # Add debugging information
+        logger.info(
+            f"🔍 Query: '{query}', Types: {memory_types}, "
+            f"Limit: {limit}, Min score: {min_score}"
+        )
+        
         results = self.memory_manager.query_memory(
             query, memory_types, limit, min_score
+        )
+        
+        logger.info(
+            f"📊 Query results: success={results.get('success')}, "
+            f"total_found={results.get('total_found', 0)}"
         )
         
         if results.get("success", False):
@@ -128,17 +139,48 @@ class ToolHandlers:
                 f"Found {len(memories)} relevant memories:\n\n"
             )
             
-            for i, memory in enumerate(memories, 1):
-                content = memory.get('content', 'No content')
-                score = memory.get('score', 0)
-                mem_type = memory.get('memory_type', 'unknown')
-                response_text += (
-                    f"{i}. {content} "
-                    f"(Score: {score:.3f}, Type: {mem_type})\n\n"
-                )
+            if len(memories) == 0:
+                response_text += "No memories found matching the criteria.\n"
+                response_text += "\n🔧 Debug Info:\n"
+                response_text += f"- Query: '{query}'\n"
+                response_text += f"- Memory types searched: {memory_types}\n"
+                response_text += f"- Minimum score threshold: {min_score}\n"
+                response_text += f"- Result limit: {limit}\n"
+                
+                # Add collection status
+                try:
+                    collections = self.memory_manager.client.get_collections()
+                    for collection in collections.collections:
+                        name_matches = any(
+                            collection.name.endswith(mt) or mt in collection.name
+                            for mt in memory_types
+                        )
+                        if name_matches:
+                            info = self.memory_manager.client.get_collection(
+                                collection.name
+                            )
+                            response_text += (
+                                f"- Collection '{collection.name}': "
+                                f"{info.points_count} points\n"
+                            )
+                except Exception as e:
+                    response_text += f"- Collection info error: {e}\n"
+            else:
+                for i, memory in enumerate(memories, 1):
+                    content = memory.get('content', 'No content')
+                    score = memory.get('score', 0)
+                    mem_type = memory.get('memory_type', 'unknown')
+                    response_text += (
+                        f"{i}. {content} "
+                        f"(Score: {score:.3f}, Type: {mem_type})\n\n"
+                    )
         else:
             error_msg = results.get('error', 'Unknown error')
-            response_text = f"Query failed: {error_msg}"
+            response_text = f"Query failed: {error_msg}\n\n"
+            response_text += "🔧 Debug Info:\n"
+            response_text += f"- Query: '{query}'\n"
+            response_text += f"- Memory types: {memory_types}\n"
+            response_text += f"- Error details: {error_msg}\n"
         
         return {
             "content": [{"type": "text", "text": response_text}]
@@ -332,57 +374,16 @@ class ToolHandlers:
     async def handle_process_markdown_directory(
         self, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Handle process_markdown_directory tool call."""
+        """Handle process_markdown_directory tool call.
+        
+        Note: This function is maintained for backward compatibility.
+        It delegates to batch_process_directory which properly stores content.
+        """
         try:
-            directory = arguments.get("directory", "./")
-            memory_type = arguments.get("memory_type")
-            auto_suggest = arguments.get("auto_suggest", True)
-            ai_enhance = arguments.get("ai_enhance", True)
-            recursive = arguments.get("recursive", True)
-            
-            results = await self.markdown_processor.process_directory_batch(
-                directory, memory_type, auto_suggest, ai_enhance, recursive
-            )
-            
-            total_files = results['total_files']
-            processed = len(results['processed_files'])
-            failed = len(results['failed_files'])
-            suggestions = results['memory_type_suggestions']
-            
-            response_text = (
-                f"Directory Processing Results:\n\n"
-                f"• Directory: {directory}\n"
-                f"• Total files found: {total_files}\n"
-                f"• Successfully processed: {processed}\n"
-                f"• Failed: {failed}\n"
-                f"• AI enhanced: {ai_enhance}\n\n"
-            )
-            
-            if suggestions:
-                response_text += "Memory Type Suggestions:\n"
-                for mem_type, count in suggestions.items():
-                    response_text += f"• {mem_type}: {count} files\n"
-                response_text += "\n"
-            
-            if results['processed_files']:
-                response_text += "Processed Files:\n"
-                for file_result in results['processed_files'][:10]:  # Show first 10
-                    response_text += (
-                        f"• {file_result['name']} → "
-                        f"{file_result['final_memory_type']}\n"
-                    )
-                if len(results['processed_files']) > 10:
-                    response_text += f"• ... and {len(results['processed_files']) - 10} more\n"
-            
-            if results['failed_files']:
-                response_text += "\nFailed Files:\n"
-                for failed_file in results['failed_files']:
-                    response_text += f"• {failed_file['name']}: {failed_file['error']}\n"
-            
-            return {
-                "content": [{"type": "text", "text": response_text}]
-            }
-            
+            # Just delegate to the batch_process_directory handler
+            # which will properly store content in the database
+            logger.info(f"Redirecting process_markdown_directory to batch_process_directory: {arguments}")
+            return await self.handle_batch_process_directory(arguments)
         except Exception as e:
             logger.error(f"Error in process_markdown_directory: {e}")
             return {
@@ -777,16 +778,16 @@ class ToolHandlers:
         """Handle complete directory processing with end-to-end pipeline."""
         try:
             directory = arguments.get("directory", "./")
-            memory_type = arguments.get("memory_type")
+            memory_type = arguments.get("memory_type", "global")
             recursive = arguments.get("recursive", True)
             agent_id = arguments.get("agent_id")
             
             # Step 1: Discover markdown files
-            discovered_files = await self.markdown_processor.scan_directory_for_markdown(
+            files = await self.markdown_processor.scan_directory_for_markdown(
                 directory, recursive=recursive
             )
             
-            if not discovered_files["files"]:
+            if not files:
                 return {
                     "content": [
                         {"type": "text", 
@@ -794,33 +795,115 @@ class ToolHandlers:
                     ]
                 }
             
-            # Step 2: Process each file through complete pipeline
-            file_assignments = []
-            for file_info in discovered_files["files"]:
-                file_assignments.append({
-                    "path": file_info["path"],
-                    "memory_type": memory_type,
-                    "agent_id": agent_id
-                })
+            # Step 2: Process each file directly - don't use markdown_processor.process_directory_batch
+            processed_count = 0
+            error_count = 0
+            stored_chunks_count = 0
+            file_results = []
             
-            # Use batch processing tool
-            batch_result = await self.handle_batch_process_markdown_files({
-                "file_assignments": file_assignments,
-                "default_memory_type": memory_type
-            })
+            for file_info in files:
+                file_path = file_info["path"]
+                try:
+                    # Read file content
+                    content = await self.markdown_processor.read_markdown_file(file_path)
+                    
+                    # Skip empty files
+                    if not content or not content.strip():
+                        file_results.append({
+                            "path": file_path,
+                            "status": "skipped",
+                            "reason": "Empty file"
+                        })
+                        continue
+                    
+                    # Generate file hash for deduplication
+                    import hashlib
+                    file_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
+                    
+                    # Clean and optimize content
+                    cleaned_content = self.markdown_processor.clean_content(content)
+                    
+                    # Create chunks
+                    chunks = self.markdown_processor.chunk_content(cleaned_content)
+                    
+                    # Store each chunk in memory
+                    file_chunks_stored = 0
+                    for chunk in chunks:
+                        chunk_text = chunk.get('content', '')  # Use 'content' key instead of 'text'
+                        if not chunk_text:
+                            continue
+                        
+                        # Store in specified memory type
+                        try:
+                            metadata = {
+                                "source_file": file_path,
+                                "chunk_index": chunk.get('chunk_index', 0),
+                                "file_hash": file_hash
+                            }
+                            
+                            if agent_id:
+                                metadata["agent_id"] = agent_id
+                            
+                            chunk_id = self.memory_manager.async_add_to_memory(
+                                content=chunk_text,
+                                memory_type=memory_type,
+                                agent_id=agent_id,
+                                metadata=metadata
+                            )
+                            file_chunks_stored += 1
+                        except Exception as e:
+                            logger.error(f"Error storing chunk from {file_path}: {e}")
+                    
+                    stored_chunks_count += file_chunks_stored
+                    processed_count += 1
+                    
+                    file_results.append({
+                        "path": file_path,
+                        "status": "processed",
+                        "chunks_stored": file_chunks_stored,
+                        "memory_type": memory_type
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Error processing file {file_path}: {e}")
+                    error_count += 1
+                    file_results.append({
+                        "path": file_path,
+                        "status": "error",
+                        "error": str(e)
+                    })
             
-            # Enhance response with directory context
-            if not batch_result.get("isError"):
-                original_text = batch_result["content"][0]["text"]
-                enhanced_text = (
-                    f"Directory Processing Complete: {directory}\n"
-                    f"📂 Directory: {directory} ({'recursive' if recursive else 'non-recursive'})\n"
-                    f"🔍 Files discovered: {len(discovered_files['files'])}\n\n"
-                    f"{original_text}"
-                )
-                batch_result["content"][0]["text"] = enhanced_text
+            # Format response
+            response_text = (
+                f"Directory Processing Complete: {directory}\n\n"
+                f"📂 Directory: {directory} ({'recursive' if recursive else 'non-recursive'})\n"
+                f"🔍 Files discovered: {len(files)}\n"
+                f"✅ Successfully processed: {processed_count}\n"
+                f"❌ Errors: {error_count}\n"
+                f"💾 Total chunks stored: {stored_chunks_count}\n"
+                f"🧠 Memory type: {memory_type}\n"
+            )
             
-            return batch_result
+            if agent_id:
+                response_text += f"👤 Agent ID: {agent_id}\n"
+            
+            response_text += "\n📄 Processed Files:\n"
+            for result in file_results:
+                status_icon = "✅" if result["status"] == "processed" else "❌"
+                response_text += f"{status_icon} {result['path']}"
+                
+                if result["status"] == "processed":
+                    response_text += f" ({result['chunks_stored']} chunks stored)"
+                elif result["status"] == "error":
+                    response_text += f" (Error: {result['error']})"
+                
+                response_text += "\n"
+            
+            return {
+                "content": [
+                    {"type": "text", "text": response_text}
+                ]
+            }
             
         except Exception as e:
             logger.error(f"Error in batch_process_directory: {e}")
