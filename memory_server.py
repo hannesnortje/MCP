@@ -156,19 +156,34 @@ def launch_ui(server_info=None):
     
     # Launch UI subprocess
     try:
-        # Use DETACHED_PROCESS on Windows to avoid console window
-        if sys.platform == 'win32':
-            creationflags = subprocess.DETACHED_PROCESS
-        else:
-            creationflags = 0
+        # Get the current directory as the working directory
+        working_dir = os.path.abspath(os.path.dirname(__file__))
         
-        ui_process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            creationflags=creationflags,
-            text=True
-        )
+        # When running in Cursor, make sure to pass along environment variables
+        env = os.environ.copy()
+        
+        # Create the subprocess with appropriate settings
+        if sys.platform == 'win32':
+            # Windows requires different creation flags
+            creationflags = subprocess.CREATE_NEW_CONSOLE
+            ui_process = subprocess.Popen(
+                cmd,
+                cwd=working_dir,
+                env=env,
+                creationflags=creationflags,
+            )
+        else:
+            # Unix/Linux/Mac version
+            ui_process = subprocess.Popen(
+                cmd,
+                cwd=working_dir,
+                env=env,
+                # Redirect output to devnull to avoid blocking
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                # Start a new process group
+                preexec_fn=os.setpgrp
+            )
         
         # Log subprocess ID
         logger.info(f"UI process launched with PID {ui_process.pid}")
@@ -238,7 +253,31 @@ def main():
                 "server_mode": server_mode,
                 "pid": os.getpid()
             }
+            logger.info(
+                f"Attempting to launch UI with server info: {server_info}"
+            )
             ui_process = launch_ui(server_info)
+            
+            if ui_process:
+                pid = ui_process.pid
+                logger.info(
+                    f"UI process launched successfully with PID {pid}"
+                )
+            else:
+                logger.error("Failed to launch UI process")
+                
+                # Provide some troubleshooting info
+                logger.error("Troubleshooting information:")
+                logger.error(f"  Python executable: {sys.executable}")
+                logger.error(f"  Current directory: {os.getcwd()}")
+                logger.error(
+                    f"  PYTHONPATH: {os.environ.get('PYTHONPATH', 'Not set')}"
+                )
+                
+                ui_path = os.path.join(
+                    os.path.dirname(__file__), 'src', 'ui', 'main.py'
+                )
+                logger.error(f"  UI module exists: {os.path.exists(ui_path)}")
         
         # Define cleanup function for UI process
         def cleanup_ui():

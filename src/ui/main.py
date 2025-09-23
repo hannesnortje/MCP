@@ -17,10 +17,16 @@ from src.ui.main_window import MainWindow
 from src.ui.memory_adapter import MemoryAdapter
 
 
-# Configure logging
+# Configure logging with more details
+log_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+log_file = os.path.join(log_dir, 'ui_log.txt')
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(log_file)
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -28,7 +34,9 @@ logger = logging.getLogger(__name__)
 def parse_arguments():
     """Parse command-line arguments for UI configuration."""
     parser = argparse.ArgumentParser(
-        description="MCP Memory Server UI - Memory visualization and management"
+        description=(
+            "MCP Memory Server UI - Memory visualization and management"
+        )
     )
     
     parser.add_argument(
@@ -136,8 +144,14 @@ async def async_main():
 def run_ui():
     """Run the UI application."""
     try:
+        logger.info("Starting MCP Memory Server UI...")
+        logger.info(f"Python executable: {sys.executable}")
+        logger.info(f"Current directory: {os.getcwd()}")
+        logger.info(f"Command line arguments: {sys.argv}")
+        
         if sys.platform == 'win32':
             # Set event loop policy for Windows
+            logger.info("Using Windows event loop policy")
             asyncio.set_event_loop_policy(
                 asyncio.WindowsSelectorEventLoopPolicy()
             )
@@ -147,16 +161,18 @@ def run_ui():
         asyncio.set_event_loop(loop)
         
         # Run the async main function
+        logger.info("Starting async_main function")
         exit_code = loop.run_until_complete(async_main())
         
         # Clean up and exit
         loop.close()
+        logger.info(f"UI exiting with code {exit_code}")
         sys.exit(exit_code)
     except KeyboardInterrupt:
         logger.info("Application terminated by user")
         sys.exit(0)
     except Exception as e:
-        logger.error(f"Error running UI: {e}")
+        logger.error(f"Error running UI: {e}", exc_info=True)
         sys.exit(1)
 
 
