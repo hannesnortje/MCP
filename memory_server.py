@@ -45,6 +45,9 @@ Server Modes:
 UI Options:
   --ui              Launch with UI for memory visualization and management
   --ui-only         Launch only the UI without the server (connect to existing)
+  --no-ui           Explicitly disable UI auto-launch
+  
+  Note: UI will auto-launch in interactive environments unless --no-ui is used
 
 Examples:
   python memory_server.py                    # Full mode
@@ -86,6 +89,11 @@ Examples:
         action="store_true",
         help="Launch only the UI without the server (connect to existing)"
     )
+    ui_group.add_argument(
+        "--no-ui",
+        action="store_true",
+        help="Explicitly disable UI auto-launch"
+    )
     
     return parser.parse_args()
 
@@ -110,6 +118,23 @@ def determine_server_mode(args):
     return "full"
 
 
+def should_auto_launch_ui():
+    """Determine if UI should be auto-launched based on environment."""
+    # Check if running in an interactive terminal
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        return True
+    
+    # Check specific environment variables that indicate interactive use
+    if os.getenv("CURSOR", "").lower() in ("1", "true", "yes"):
+        return True
+    if os.getenv("VSCODE", "").lower() in ("1", "true", "yes"):
+        return True
+    if os.getenv("TERM"):  # Terminal environment variable is set
+        return True
+    
+    return False
+
+
 def should_launch_ui(args):
     """Determine if UI should be launched based on arguments and env vars."""
     # Check environment variables first
@@ -123,6 +148,13 @@ def should_launch_ui(args):
         return True
     if args.ui_only:
         return "ui-only"
+    
+    # Auto-launch UI if running in interactive environment
+    # and no explicit --no-ui flag was passed
+    if not hasattr(args, 'no_ui') or not args.no_ui:
+        if should_auto_launch_ui():
+            logger.info("Auto-launching UI (interactive environment detected)")
+            return True
     
     # Default: no UI
     return False
@@ -220,6 +252,15 @@ def main():
         args = parse_arguments()
         server_mode = determine_server_mode(args)
         ui_option = should_launch_ui(args)
+        
+        # Debug logging
+        logger.info(f"Server mode: {server_mode}")
+        logger.info(f"UI option: {ui_option}")
+        logger.info(f"Interactive terminal (stdin): {sys.stdin.isatty()}")
+        logger.info(f"Interactive terminal (stdout): {sys.stdout.isatty()}")
+        logger.info(f"CURSOR env var: {os.getenv('CURSOR', 'Not set')}")
+        logger.info(f"VSCODE env var: {os.getenv('VSCODE', 'Not set')}")
+        logger.info(f"TERM env var: {os.getenv('TERM', 'Not set')}")
         
         # Handle UI-only mode
         if ui_option == "ui-only":
