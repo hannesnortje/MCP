@@ -17,6 +17,10 @@ markdown = "^3.5.0"
 beautifulsoup4 = "^4.12.0"
 aiofiles = "^24.1.0"
 pyyaml = "^6.0.0"
+# UI dependencies
+PySide6 = "^6.7.0"        # Qt6 Python bindings for desktop UI
+requests = "^2.32.1"      # For HTTP communication if needed
+websockets = "^12.0"      # WebSocket client for real-time updates
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
