@@ -1,104 +1,112 @@
 """
 MCP Memory Server UI - Main Entry Point
-Main script for launching the MCP Memory Server UI.
+Main entry point for the MCP Memory Server UI.
 """
 
 import sys
 import logging
-import argparse
-from typing import Optional, Dict, Any
-
+import asyncio
+import signal
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QTimer, QEventLoop
 
-from src.ui.main_window import MemoryMainWindow
+from src.ui.main_window import MainWindow
+from src.ui.memory_adapter import MemoryAdapter
 
 
-def create_application() -> QApplication:
-    """Create and configure the Qt application."""
-    # Set application attributes
-    app_attrs = Qt.ApplicationAttribute
-    try:
-        QApplication.setAttribute(app_attrs.AA_EnableHighDpiScaling, True)
-        QApplication.setAttribute(app_attrs.AA_UseHighDpiPixmaps, True)
-    except AttributeError:
-        # These attributes might not exist in newer Qt versions
-        pass
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
+
+async def init_memory_adapter():
+    """Initialize the memory adapter.
+    
+    Returns:
+        Initialized memory adapter.
+    """
+    adapter = MemoryAdapter()
+    success = await adapter.initialize()
+    if not success:
+        logger.warning("Failed to initialize memory adapter.")
+    return adapter
+
+
+async def async_main():
+    """Async entry point for the application."""
     # Create application
     app = QApplication(sys.argv)
     app.setApplicationName("MCP Memory Server")
-    app.setApplicationVersion("0.1.0")
-    app.setOrganizationName("MCP")
-    app.setOrganizationDomain("mcp.local")
-
-    return app
-
-
-def parse_arguments() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="MCP Memory Server UI",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "--server-connection",
-        help="Path to server connection info file"
-    )
-    parser.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        default="INFO",
-        help="Set the logging level"
-    )
     
-    return parser.parse_args()
-
-
-def main() -> int:
-    """Main UI entry point."""
-    args = parse_arguments()
+    # Create event loop integration
+    loop = asyncio.get_event_loop()
     
-    # Set up logging
-    logging.basicConfig(
-        level=getattr(logging, args.log_level),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    # Handle signal to quit app
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, app.quit)
+    
+    # Create window first so it appears quickly
+    window = MainWindow()
+    window.show()
+    
+    # Initialize memory adapter
+    adapter = await init_memory_adapter()
+    window.initialize_with_adapter(adapter)
+    
+    # Create timer to process asyncio events
+    timer = QTimer()
+    timer.setInterval(10)  # 10ms
+    
+    # Process asyncio events from the Qt event loop
+    async def process_asyncio_events():
+        await asyncio.sleep(0)
+    
+    timer.timeout.connect(
+        lambda: asyncio.create_task(process_asyncio_events())
     )
-    logger = logging.getLogger(__name__)
+    timer.start()
     
+    # Create Qt event loop
+    qt_loop = QEventLoop()
+    app.aboutToQuit.connect(qt_loop.quit)
+    
+    # Run the Qt event loop
+    qt_loop.exec()
+    
+    # Clean up
+    timer.stop()
+    return 0
+
+
+def run_ui():
+    """Run the UI application."""
     try:
-        # Log startup
-        logger.info("Starting MCP Memory Server UI...")
+        if sys.platform == 'win32':
+            # Set event loop policy for Windows
+            asyncio.set_event_loop_policy(
+                asyncio.WindowsSelectorEventLoopPolicy()
+            )
         
-        # Check if server connection info provided
-        server_connection: Optional[Dict[str, Any]] = None
-        if args.server_connection:
-            import json
-            try:
-                with open(args.server_connection) as f:
-                    server_connection = json.load(f)
-                logger.info(f"Loaded server connection info: {args.server_connection}")
-            except Exception as e:
-                logger.error(f"Failed to load server connection info: {e}")
+        # Create and run the asyncio event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        # Create application
-        app = create_application()
+        # Run the async main function
+        exit_code = loop.run_until_complete(async_main())
         
-        # Create main window (placeholder for now)
-        main_window = MemoryMainWindow(server_connection)
-        main_window.show()
-        
-        logger.info("MCP Memory Server UI started successfully")
-        
-        # Run application
-        return app.exec()
-    
+        # Clean up and exit
+        loop.close()
+        sys.exit(exit_code)
+    except KeyboardInterrupt:
+        logger.info("Application terminated by user")
+        sys.exit(0)
     except Exception as e:
-        logger.error(f"Failed to start MCP Memory Server UI: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return 1
+        logger.error(f"Error running UI: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    run_ui()
