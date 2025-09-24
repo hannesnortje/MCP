@@ -153,6 +153,7 @@ class QdrantMemoryManager:
         # Initialize the generic service with the same client and model
         self.generic_service.client = self.client
         self.generic_service.embedding_model = self.embedding_model
+        self.generic_service.collection_manager = self.collection_manager
         self.generic_service.initialized = True
     
     def _initialize_modules(self) -> None:
