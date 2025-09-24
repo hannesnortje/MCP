@@ -7,8 +7,9 @@ of concerns.
 """
 
 import logging
+import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 from ..config import Config
@@ -25,8 +26,29 @@ class AgentRegistry:
         self.embedding_service = embedding_service
     
     def _agent_id_to_point_id(self, agent_id: str) -> str:
-        """Convert agent ID to point ID for storage."""
-        return f"agent_{agent_id}"
+        """Convert agent ID to valid Qdrant point ID.
+        
+        Qdrant requires point IDs to be either unsigned integers or UUIDs.
+        This function converts any agent ID to a valid UUID using UUID5
+        (deterministic namespace-based UUID).
+        
+        Args:
+            agent_id: The original agent ID (may have prefixes like 'dev-')
+            
+        Returns:
+            A valid UUID string that can be used as Qdrant point ID
+        """
+        # If agent_id is already a valid UUID, use it directly
+        try:
+            uuid.UUID(agent_id)
+            return agent_id  # It's already a valid UUID
+        except ValueError:
+            pass
+        
+        # Create a deterministic UUID5 based on the agent_id
+        # Using a fixed namespace for consistency
+        namespace = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')
+        return str(uuid.uuid5(namespace, agent_id))
     
     async def register_agent(
         self,
@@ -72,7 +94,9 @@ class AgentRegistry:
                 points=[point]
             )
 
-            logger.info(f"✅ Registered agent {agent_id} with role {agent_role}")
+            logger.info(
+                f"✅ Registered agent {agent_id} with role {agent_role}"
+            )
             return {
                 "success": True,
                 "agent_id": agent_id,
@@ -236,7 +260,9 @@ class AgentRegistry:
                 
                 # Use vector operations to store learned content
                 from .vector_operations import VectorOperations
-                vector_ops = VectorOperations(self.client, self.embedding_service)
+                vector_ops = VectorOperations(
+                    self.client, self.embedding_service
+                )
                 
                 await vector_ops.async_add_to_memory(
                     content=learned_content,
