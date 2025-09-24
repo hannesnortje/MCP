@@ -14,16 +14,18 @@ class SystemTools:
 
     @staticmethod
     def get_tools() -> List[Dict[str, Any]]:
-        """Get system management tool definitions."""
+        """Get system monitoring tool definitions."""
         return [
             {
-                "name": "get_system_status",
-                "description": "Get current system status and health",
+                "name": "system_health",
+                "description": (
+                    "Check system health and get diagnostic information "
+                    "about all components"
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {},
-                    "required": []
+                    "additionalProperties": False
                 }
             }
-            # Additional system tools would be extracted here
         ]
