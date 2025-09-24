@@ -1,10 +1,9 @@
 """
-MCP Memory Server UI Widgets Package
-UI widgets for the MCP memory server interface.
+Widgets package for AutoGen UI Clean
 """
 
-from typing import List
+from .memory_browser import MemoryBrowserWidget
+from .agent_manager import AgentManagerWidget
+from .session_manager import SessionManagerWidget
 
-from src.ui.widgets.memory_browser import MemoryBrowserWidget
-
-__all__: List[str] = ["MemoryBrowserWidget"]
+__all__ = ["MemoryBrowserWidget", "AgentManagerWidget", "SessionManagerWidget"]

@@ -1,6 +1,5 @@
 """
-MCP Memory Server UI Package
-UI components for interacting with the MCP memory server.
+AutoGen UI Clean package init
 """
 
-__version__ = "0.1.0"
+# Package marker file
