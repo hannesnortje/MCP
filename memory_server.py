@@ -112,11 +112,19 @@ def determine_server_mode(args):
 
 def should_launch_ui(args):
     """Determine if UI should be launched based on arguments and env vars."""
-    # Check environment variables first
+    # Check environment variables first (including MCP config vars)
     if os.getenv("UI", "").lower() in ("1", "true", "yes"):
         return True
     if os.getenv("UI_ONLY", "").lower() in ("1", "true", "yes"):
         return "ui-only"
+    
+    # Check MCP configuration environment variables
+    browser_mode = os.getenv("BROWSER_AUTO_OPEN_MODE", "").lower()
+    if browser_mode in ("always", "true", "1"):
+        return True
+    dashboard_open = os.getenv("DASHBOARD_AUTO_OPEN", "").lower()
+    if dashboard_open in ("true", "1", "yes"):
+        return True
     
     # Check command line arguments
     if args.ui:
@@ -153,6 +161,8 @@ def launch_ui(server_info=None):
     cmd = [sys.executable, "-m", "src.ui.main"]
     if connection_file:
         cmd.extend(["--connection-file", connection_file.name])
+    
+    logger.info(f"UI launch command: {' '.join(cmd)}")
     
     # Launch UI subprocess
     try:
@@ -205,6 +215,16 @@ def main():
         args = parse_arguments()
         server_mode = determine_server_mode(args)
         ui_option = should_launch_ui(args)
+        
+        # Debug logging for UI options
+        logger.info(f"UI option result: {ui_option}")
+        logger.info("Environment variables:")
+        browser_mode = os.getenv('BROWSER_AUTO_OPEN_MODE', 'not set')
+        logger.info(f"  BROWSER_AUTO_OPEN_MODE: {browser_mode}")
+        dashboard_open = os.getenv('DASHBOARD_AUTO_OPEN', 'not set')
+        logger.info(f"  DASHBOARD_AUTO_OPEN: {dashboard_open}")
+        logger.info(f"  UI: {os.getenv('UI', 'not set')}")
+        logger.info(f"  Args: --ui={args.ui}, --ui-only={args.ui_only}")
         
         # Handle UI-only mode
         if ui_option == "ui-only":
