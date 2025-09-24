@@ -112,7 +112,13 @@ def determine_server_mode(args):
 
 def should_launch_ui(args):
     """Determine if UI should be launched based on arguments and env vars."""
-    # Check environment variables first (including MCP config vars)
+    # Check command line arguments first (most explicit)
+    if args.ui:
+        return True
+    if args.ui_only:
+        return "ui-only"
+    
+    # Check environment variables
     if os.getenv("UI", "").lower() in ("1", "true", "yes"):
         return True
     if os.getenv("UI_ONLY", "").lower() in ("1", "true", "yes"):
@@ -125,12 +131,6 @@ def should_launch_ui(args):
     dashboard_open = os.getenv("DASHBOARD_AUTO_OPEN", "").lower()
     if dashboard_open in ("true", "1", "yes"):
         return True
-    
-    # Check command line arguments
-    if args.ui:
-        return True
-    if args.ui_only:
-        return "ui-only"
     
     # Default: no UI
     return False
@@ -172,16 +172,32 @@ def launch_ui(server_info=None):
         else:
             creationflags = 0
         
+        # Don't capture output to prevent hanging - let UI output to terminal
         ui_process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
             creationflags=creationflags,
             text=True
         )
         
-        # Log subprocess ID
+        # Log subprocess ID and give it time to start
         logger.info(f"UI process launched with PID {ui_process.pid}")
+        
+        # Give UI a moment to start and check if it failed immediately
+        import time
+        time.sleep(1)
+        
+        if ui_process.poll() is not None:
+            # Process exited immediately - probably an error
+            logger.error(
+                f"UI process exited immediately with code "
+                f"{ui_process.returncode}"
+            )
+            if connection_file:
+                try:
+                    os.unlink(connection_file.name)
+                except Exception:
+                    pass
+            return None
         
         # Set up cleanup for connection file
         if connection_file:
