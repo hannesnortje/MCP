@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # keep type-checkers happy)
 LocalMemoryClientCls: Any
 try:
-    from autogen_ui.local_memory_client import (
+    from ..local_memory_client import (
         LocalMemoryClient as _LocalMemoryClient,
     )
 
@@ -47,8 +47,10 @@ except Exception:
     LocalMemoryClientCls = None
 
 # Import the new memory service
+# TODO: Implement MCP-compatible memory service
 try:
-    from autogen_ui.services import MemoryService
+    # from ..services import MemoryService
+    MemoryService = None  # Temporarily disabled for MCP compatibility
 except ImportError:
     MemoryService = None
 
@@ -321,7 +323,7 @@ class MemoryBrowserWidget(QWidget):
 
         # Initialize Local mode default from env and sync toggles
         try:
-            env_val = os.getenv("AUTOGEN_UI_LOCAL_MODE", "true")
+            env_val = os.getenv("MCP_UI_LOCAL_MODE", "true")
             default_local = env_val.lower() in ("1", "true", "yes")
         except Exception:
             default_local = True

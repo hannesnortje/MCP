@@ -35,8 +35,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont
 
-from autogen_ui.services.session_service import SessionService
-from autogen_ui.dialogs.agent_selection_dialog import AgentSelectionDialog
+from ..services.session_service import SessionService
+from ..dialogs.agent_selection_dialog import AgentSelectionDialog
 
 logger = logging.getLogger(__name__)
 
