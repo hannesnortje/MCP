@@ -6,11 +6,12 @@ notifications, memory operations, and other cross-widget functionality.
 """
 
 from .session_service import SessionService
-# TODO: Implement MCP-compatible memory service
-# from .memory_service import MemoryService
 from .conversation_service import ConversationService
+# Import the direct memory service (much simpler than MCP protocol)
+from ..direct_memory_service import DirectMemoryService as MemoryService
 
 __all__ = [
     "SessionService",
-    "ConversationService"
-]  # "MemoryService" removed temporarily
+    "ConversationService",
+    "MemoryService"
+]

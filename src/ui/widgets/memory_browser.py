@@ -46,11 +46,9 @@ try:
 except Exception:
     LocalMemoryClientCls = None
 
-# Import the new memory service
-# TODO: Implement MCP-compatible memory service
+# Import the new MCP memory service
 try:
-    # from ..services import MemoryService
-    MemoryService = None  # Temporarily disabled for MCP compatibility
+    from ..services import MemoryService
 except ImportError:
     MemoryService = None
 
