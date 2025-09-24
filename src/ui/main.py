@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-AutoGen Desktop UI - Main Entry Point
+MCP UI - Main Entry Point
 
-This module serves as the entry point for the AutoGen desktop application.
+This module serves as the entry point for the MCP Memory Server desktop application.
 It sets up the Qt application, logging, and launches the main window.
 """
 
@@ -12,7 +12,7 @@ import logging
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 
-from .main_window import AutoGenMainWindow
+from .main_window import MCPMainWindow
 from .config import load_config
 
 
@@ -59,7 +59,7 @@ def main() -> int:
         app = create_application()
 
         # Create main window
-        main_window = AutoGenMainWindow(config)
+        main_window = MCPMainWindow(config)
         main_window.show()
 
         logger.info("MCP Memory Server UI started successfully")

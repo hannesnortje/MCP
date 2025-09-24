@@ -1,6 +1,6 @@
 """
-AutoGen UI - Main Window (Clean Rebuild)
-A simplified, working main window without segfault issues
+MCP UI - Main Window
+Main window for the MCP Memory Server desktop application
 """
 
 import logging
@@ -275,15 +275,15 @@ class ServerWidget(QWidget):
             cursor.removeSelectedText()
 
 
-class AutoGenMainWindow(QMainWindow):
-    """Clean, simple AutoGen main window"""
+class MCPMainWindow(QMainWindow):
+    """Main window for MCP Memory Server UI"""
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__()
         self.config = config
 
         # Set window properties
-        self.setWindowTitle("AutoGen Desktop UI - Clean Build")
+        self.setWindowTitle("MCP Memory Server UI")
         geometry = config["ui"]["window_geometry"]
         self.resize(geometry["width"], geometry["height"])
         self.setMinimumSize(800, 600)
@@ -302,7 +302,7 @@ class AutoGenMainWindow(QMainWindow):
         # Connect real-time updates
         self.connect_realtime_services()
 
-        logger.info("AutoGen main window initialized successfully")
+        logger.info("MCP main window initialized successfully")
 
     def setup_menu(self):
         """Set up menu bar"""
@@ -436,12 +436,12 @@ class AutoGenMainWindow(QMainWindow):
         """Set up status bar"""
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("Ready - AutoGen Desktop UI (Clean Build)")
+        self.status_bar.showMessage("Ready - MCP Memory Server UI")
 
     def on_connection_status_changed(self, connected: bool):
         """Handle server connection status changes"""
         if connected:
-            self.status_bar.showMessage("Connected to AutoGen MCP Server")
+            self.status_bar.showMessage("Connected to MCP Memory Server")
             self.conversation_widget.send_btn.setEnabled(True)
         else:
             self.status_bar.showMessage("Disconnected from server")
@@ -451,10 +451,10 @@ class AutoGenMainWindow(QMainWindow):
         """Show about dialog"""
         QMessageBox.about(
             self,
-            "About AutoGen Desktop UI",
-            "AutoGen Desktop UI - Clean Build\n\n"
-            "A simplified, reliable interface for the AutoGen MCP Server.\n"
-            "Built with PySide6 and designed for stability.",
+            "About MCP Memory Server UI",
+            "MCP Memory Server UI\n\n"
+            "A desktop interface for the MCP Memory Server.\n"
+            "Built with PySide6 for vector memory management and agent operations.",
         )
 
     def setup_services(self):
@@ -599,5 +599,5 @@ class AutoGenMainWindow(QMainWindow):
         if hasattr(self, "realtime_service"):
             self.realtime_service.disconnect_all()
 
-        logger.info("AutoGen main window closing")
+        logger.info("MCP main window closing")
         super().closeEvent(event)
