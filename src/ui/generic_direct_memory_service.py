@@ -404,6 +404,29 @@ class GenericDirectMemoryService(QObject):
         else:
             return "project-notes"  # Default suggestion
 
+    async def delete_memory(
+        self, memory_id: str, collection: str
+    ) -> Dict[str, Any]:
+        """Delete a specific memory document."""
+        if not self._ensure_initialized():
+            return {"success": False, "error": "Service not initialized"}
+            
+        try:
+            result = await self.memory_service.delete_memory(
+                memory_id=memory_id, collection=collection
+            )
+            
+            if result.get("success"):
+                logger.info(f"✅ Deleted memory {memory_id} from {collection}")
+            else:
+                logger.error(f"❌ Failed to delete memory: {result.get('error')}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to delete memory: {e}")
+            return {"success": False, "error": str(e)}
+
     # Helper methods
     
     def _ensure_initialized(self) -> bool:

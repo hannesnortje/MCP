@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLineEdit, QPushButton,
     QComboBox, QSpinBox, QLabel, QTreeWidget, QTreeWidgetItem, QTextEdit,
     QTabWidget, QTableWidget, QTableWidgetItem, QFrame, QMessageBox,
-    QCheckBox, QFormLayout, QDialog, QMenu
+    QCheckBox, QFormLayout, QDialog, QMenu, QSplitter
 )
 from PySide6.QtCore import QTimer, Signal, Qt
 from PySide6.QtGui import QFont, QAction
@@ -279,14 +279,55 @@ class GenericMemoryBrowserWidget(QWidget):
         
         results_layout.addLayout(header_layout)
         
+        # Create splitter for results table and content preview
+        results_splitter = QSplitter(Qt.Vertical)
+        
         # Results table
         self.results_table = QTableWidget()
-        self.results_table.setColumnCount(4)
+        self.results_table.setColumnCount(5)  # Added column for actions
         self.results_table.setHorizontalHeaderLabels([
-            "Score", "Content", "Collection", "Tags"
+            "Score", "Content", "Collection", "Tags", "Actions"
         ])
         self.results_table.setSelectionBehavior(QTableWidget.SelectRows)
-        results_layout.addWidget(self.results_table)
+        
+        # Enable context menu for results
+        self.results_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.results_table.customContextMenuRequested.connect(
+            self.show_results_context_menu
+        )
+        
+        # Connect selection changed to show content preview
+        self.results_table.itemSelectionChanged.connect(
+            self.show_selected_content_preview
+        )
+        
+        results_splitter.addWidget(self.results_table)
+        
+        # Content preview area
+        preview_widget = QWidget()
+        preview_layout = QVBoxLayout(preview_widget)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Preview header
+        self.preview_label = QLabel("Select a search result to view full content")
+        self.preview_label.setStyleSheet("QLabel { font-weight: bold; padding: 4px; }")
+        preview_layout.addWidget(self.preview_label)
+        
+        # Preview text area
+        self.content_preview = QTextEdit()
+        self.content_preview.setReadOnly(True)
+        self.content_preview.setPlaceholderText(
+            "Select a search result above to view the full content here..."
+        )
+        self.content_preview.setMaximumHeight(200)  # Limit height
+        preview_layout.addWidget(self.content_preview)
+        
+        results_splitter.addWidget(preview_widget)
+        
+        # Set splitter proportions (70% table, 30% preview)
+        results_splitter.setSizes([400, 200])
+        
+        results_layout.addWidget(results_splitter)
         
         self.tab_widget.addTab(results_widget, "Search Results")
 
@@ -587,6 +628,15 @@ class GenericMemoryBrowserWidget(QWidget):
             tags = result.get("payload", {}).get("tags", [])
             tags_item = QTableWidgetItem(", ".join(tags))
             self.results_table.setItem(row, 3, tags_item)
+            
+            # Actions - Delete button
+            delete_btn = QPushButton("Delete")
+            delete_btn.setMaximumWidth(60)
+            delete_btn.setStyleSheet("QPushButton { color: red; }")
+            delete_btn.clicked.connect(
+                lambda checked, r=row: self.delete_document_from_results(r)
+            )
+            self.results_table.setCellWidget(row, 4, delete_btn)
         
         self.results_label.setText(f"Found {len(results)} results for '{query}'")
         self.results_table.resizeColumnsToContents()
@@ -910,3 +960,118 @@ class GenericMemoryBrowserWidget(QWidget):
         except Exception as e:
             logger.error(f"Failed to delete collection from tree: {e}")
             QMessageBox.critical(self, "Error", str(e))
+
+    def show_results_context_menu(self, position):
+        """Show context menu for search results table."""
+        item = self.results_table.itemAt(position)
+        if not item:
+            return
+            
+        row = item.row()
+        if row < 0 or row >= len(self.current_results):
+            return
+            
+        # Create context menu
+        context_menu = QMenu(self)
+        
+        # Delete action
+        delete_action = QAction("Delete Document", self)
+        delete_action.triggered.connect(
+            lambda: self.delete_document_from_results(row)
+        )
+        context_menu.addAction(delete_action)
+        
+        # Show the context menu
+        context_menu.exec_(self.results_table.mapToGlobal(position))
+
+    def delete_document_from_results(self, row):
+        """Delete a document selected from the search results."""
+        if row < 0 or row >= len(self.current_results):
+            QMessageBox.warning(self, "Error", "Invalid document selection")
+            return
+            
+        result = self.current_results[row]
+        document_id = result.get("id")
+        collection = result.get("collection")
+        content_preview = result.get("payload", {}).get("content", "")
+        
+        if len(content_preview) > 50:
+            content_preview = content_preview[:50] + "..."
+        
+        if not document_id or not collection:
+            QMessageBox.warning(self, "Error", "Document information incomplete")
+            return
+        
+        reply = QMessageBox.question(
+            self, "Delete Document",
+            f"Are you sure you want to delete this document?\n\n"
+            f"Collection: {collection}\n"
+            f"Content: {content_preview}\n\n"
+            "This action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        if not self.memory_service or not self.memory_service._ensure_initialized():
+            QMessageBox.warning(self, "Error", "Memory service not available")
+            return
+        
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            result = loop.run_until_complete(
+                self.memory_service.delete_memory(
+                    memory_id=document_id, collection=collection
+                )
+            )
+            loop.close()
+            
+            if result.get("success"):
+                QMessageBox.information(
+                    self, "Success", "Document deleted successfully"
+                )
+                # Remove from current results and refresh display
+                self.current_results.pop(row)
+                self.display_search_results(
+                    self.current_results, 
+                    "Updated results"
+                )
+                self.refresh_stats()
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                QMessageBox.critical(
+                    self, "Error", f"Failed to delete: {error_msg}"
+                )
+                
+        except Exception as e:
+            logger.error(f"Failed to delete document: {e}")
+            QMessageBox.critical(self, "Error", str(e))
+
+    def show_selected_content_preview(self):
+        """Show full content of selected search result in preview pane."""
+        selected_items = self.results_table.selectedItems()
+        if not selected_items:
+            self.preview_label.setText("Select a search result to view full content")
+            self.content_preview.clear()
+            return
+            
+        # Get the selected row
+        row = selected_items[0].row()
+        if row < 0 or row >= len(self.current_results):
+            return
+            
+        result = self.current_results[row]
+        content = result.get("payload", {}).get("content", "No content available")
+        collection = result.get("collection", "Unknown")
+        score = result.get("score", 0.0)
+        
+        # Update preview label with metadata
+        self.preview_label.setText(
+            f"Content from '{collection}' (Score: {score:.3f})"
+        )
+        
+        # Show full content in preview area
+        self.content_preview.setPlainText(content)
