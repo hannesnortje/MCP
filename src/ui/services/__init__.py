@@ -7,8 +7,10 @@ notifications, memory operations, and other cross-widget functionality.
 
 from .session_service import SessionService
 from .conversation_service import ConversationService
-# Import the direct memory service (much simpler than MCP protocol)
-from ..direct_memory_service import DirectMemoryService as MemoryService
+# Import the new generic memory service (flexible collections)
+from ..generic_direct_memory_service import (
+    GenericDirectMemoryService as MemoryService
+)
 
 __all__ = [
     "SessionService",

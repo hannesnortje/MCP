@@ -23,7 +23,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QTextCursor
 
-from .widgets import MemoryBrowserWidget, AgentManagerWidget, SessionManagerWidget
+from .widgets import (
+    GenericMemoryBrowserWidget,
+    AgentManagerWidget,
+    SessionManagerWidget
+)
 from .widgets.enhanced_conversation_widget import EnhancedConversationWidget
 from .widgets.notification_panel import NotificationPanel
 from .services.realtime_service import RealtimeService
@@ -361,22 +365,32 @@ class AutoGenMainWindow(QMainWindow):
         self.server_widget.connection_status_changed.connect(
             self.on_connection_status_changed
         )
-        left_widget.addTab(self.server_widget, "Server")
+        server_tab_index = left_widget.addTab(self.server_widget, "Server")
+        left_widget.setTabEnabled(server_tab_index, False)  # DISABLED
 
-        # Memory Browser tab
+        # Memory Browser - using new generic system (FUNCTIONAL)
+        self.memory_browser = GenericMemoryBrowserWidget("generic")
+        memory_tab_index = left_widget.addTab(self.memory_browser, "Memory")
+
+        # Create dummy server_url for disabled tabs
         server_host = self.config["server"]["host"]
         server_port = self.config["server"]["port"]
         server_url = f"http://{server_host}:{server_port}"
-        self.memory_browser = MemoryBrowserWidget(server_url)
-        left_widget.addTab(self.memory_browser, "Memory")
 
-        # Agent Manager tab
+        # Agent Manager tab - VISIBLE but DISABLED
         self.agent_manager = AgentManagerWidget(server_url)
-        left_widget.addTab(self.agent_manager, "Agents")
+        agent_tab_index = left_widget.addTab(self.agent_manager, "Agents")
+        left_widget.setTabEnabled(agent_tab_index, False)
 
-        # Session Manager tab
+        # Session Manager tab - VISIBLE but DISABLED
         self.session_manager = SessionManagerWidget(server_url)
-        left_widget.addTab(self.session_manager, "Sessions")
+        session_tab_index = left_widget.addTab(
+            self.session_manager, "Sessions"
+        )
+        left_widget.setTabEnabled(session_tab_index, False)
+        
+        # Set Memory tab as the default active tab
+        left_widget.setCurrentIndex(memory_tab_index)
 
         # Middle - Conversation (using enhanced conversation widget with services)
         self.conversation_widget = EnhancedConversationWidget(
@@ -479,19 +493,19 @@ class AutoGenMainWindow(QMainWindow):
             self.on_server_status_changed
         )
 
-        # Connect session manager signals to conversation widget
-        if hasattr(self, "session_manager"):
-            logger.info("Connecting session manager signals to conversation widget")
-            self.session_manager.session_started.connect(
-                lambda config: self._on_session_started_for_conversation(config)
-            )
-            self.session_manager.session_ended.connect(
-                lambda session_id: self._on_session_ended_for_conversation(session_id)
-            )
-        else:
-            logger.warning(
-                "No session_manager found - conversation widget won't receive session updates!"
-            )
+        # Connect session manager signals - DISABLED for memory testing
+        # if hasattr(self, "session_manager"):
+        #     logger.info("Connecting session manager signals to conversation widget")
+        #     self.session_manager.session_started.connect(
+        #         lambda config: self._on_session_started_for_conversation(config)
+        #     )
+        #     self.session_manager.session_ended.connect(
+        #         lambda session_id: self._on_session_ended_for_conversation(session_id)
+        #     )
+        # else:
+        #     logger.warning(
+        #         "No session_manager found - conversation widget won't receive session updates!"
+        #     )
 
         logger.info("Real-time service connections established")
 
@@ -522,9 +536,10 @@ class AutoGenMainWindow(QMainWindow):
 
     def on_session_updated(self, session_id: str, update_data: dict):
         """Handle session update events"""
-        if hasattr(self, "session_manager"):
-            # Update session manager if available
-            self.session_manager.refresh_sessions()
+        # Session manager disabled for memory testing
+        # if hasattr(self, "session_manager"):
+        #     # Update session manager if available
+        #     self.session_manager.refresh_sessions()
 
         # Update status bar with session status
         status = update_data.get("status", "unknown")
