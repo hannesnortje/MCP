@@ -2023,6 +2023,249 @@ class ToolHandlers:
         """Provide guidance for recovering from policy violations."""
         return self._get_guidance_content("policy_violation_recovery")
 
+    # Generic Collection Tools
+    async def handle_create_collection(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle create_collection tool call."""
+        try:
+            collection_name = arguments.get("collection_name")
+            description = arguments.get("description", "")
+            metadata = arguments.get("metadata", {})
+            
+            if not collection_name:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "Collection name is required"}
+                    ]
+                }
+            
+            # Use the GenericMemoryService to create the collection
+            result = await self.memory_manager.generic_service.create_collection(
+                collection_name, description, metadata
+            )
+            
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Successfully created collection '{collection_name}'"
+                    }
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error creating collection: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", "text": f"Failed to create collection: {str(e)}"}
+                ]
+            }
+
+    async def handle_list_collections(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle list_collections tool call."""
+        try:
+            include_stats = arguments.get("include_stats", True)
+            
+            # Get collections from GenericMemoryService
+            collections = await self.memory_manager.generic_service.list_collections()
+            
+            result_text = f"Found {len(collections.collections)} collections:\n\n"
+            
+            for collection in collections.collections:
+                result_text += f"**{collection.name}**\n"
+                if collection.description:
+                    result_text += f"  Description: {collection.description}\n"
+                
+                if include_stats:
+                    stats = await self.memory_manager.generic_service.get_collection_stats(collection.name)
+                    result_text += f"  Documents: {stats['document_count']}\n"
+                    result_text += f"  Created: {collection.created_at}\n"
+                    
+                if collection.metadata:
+                    result_text += f"  Metadata: {collection.metadata}\n"
+                result_text += "\n"
+            
+            return {
+                "content": [
+                    {"type": "text", "text": result_text}
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error listing collections: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", "text": f"Failed to list collections: {str(e)}"}
+                ]
+            }
+
+    async def handle_add_to_collection(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle add_to_collection tool call."""
+        try:
+            collection_name = arguments.get("collection_name")
+            content = arguments.get("content")
+            metadata = arguments.get("metadata", {})
+            importance = arguments.get("importance", 0.5)
+            
+            if not collection_name or not content:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "Collection name and content are required"}
+                    ]
+                }
+            
+            # Use the GenericMemoryService to add content
+            memory_id = await self.memory_manager.generic_service.add_to_collection(
+                collection_name, content, metadata, importance
+            )
+            
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Successfully added content to collection '{collection_name}' with ID: {memory_id}"
+                    }
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error adding to collection: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", "text": f"Failed to add to collection: {str(e)}"}
+                ]
+            }
+
+    async def handle_query_collection(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle query_collection tool call."""
+        try:
+            collection_name = arguments.get("collection_name")
+            query = arguments.get("query")
+            limit = arguments.get("limit", 10)
+            min_score = arguments.get("min_score", 0.3)
+            include_metadata = arguments.get("include_metadata", True)
+            
+            if not collection_name or not query:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "Collection name and query are required"}
+                    ]
+                }
+            
+            # Use the GenericMemoryService to query the collection
+            results = await self.memory_manager.generic_service.query_collection(
+                collection_name, query, limit, min_score
+            )
+            
+            if not results:
+                result_text = f"No results found in collection '{collection_name}' for query: '{query}'"
+            else:
+                result_text = f"Found {len(results)} results in collection '{collection_name}':\n\n"
+                
+                for i, result in enumerate(results, 1):
+                    result_text += f"**Result {i}** (Score: {result.get('score', 'N/A'):.3f})\n"
+                    result_text += f"{result['content']}\n"
+                    
+                    if include_metadata and result.get('metadata'):
+                        result_text += f"Metadata: {result['metadata']}\n"
+                    result_text += "\n"
+            
+            return {
+                "content": [
+                    {"type": "text", "text": result_text}
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error querying collection: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", "text": f"Failed to query collection: {str(e)}"}
+                ]
+            }
+
+    async def handle_delete_collection(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle delete_collection tool call."""
+        try:
+            collection_name = arguments.get("collection_name")
+            confirm = arguments.get("confirm", False)
+            
+            if not collection_name:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "Collection name is required"}
+                    ]
+                }
+            
+            if not confirm:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "Confirmation required: set 'confirm' to true to delete the collection"}
+                    ]
+                }
+            
+            # Use the GenericMemoryService to delete the collection
+            await self.memory_manager.generic_service.delete_collection(collection_name)
+            
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Successfully deleted collection '{collection_name}' and all its contents"
+                    }
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error deleting collection: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", "text": f"Failed to delete collection: {str(e)}"}
+                ]
+            }
+
+    async def handle_get_collection_stats(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle get_collection_stats tool call."""
+        try:
+            collection_name = arguments.get("collection_name")
+            
+            if not collection_name:
+                return {
+                    "isError": True,
+                    "content": [
+                        {"type": "text", "text": "Collection name is required"}
+                    ]
+                }
+            
+            # Use the GenericMemoryService to get collection stats
+            stats = await self.memory_manager.generic_service.get_collection_stats(collection_name)
+            
+            result_text = f"**Statistics for Collection '{collection_name}'**\n\n"
+            result_text += f"Document Count: {stats['document_count']}\n"
+            result_text += f"Total Size: {stats.get('total_size', 'Unknown')}\n"
+            result_text += f"Last Updated: {stats.get('last_updated', 'Unknown')}\n"
+            
+            if stats.get('metadata'):
+                result_text += f"Metadata: {stats['metadata']}\n"
+            
+            return {
+                "content": [
+                    {"type": "text", "text": result_text}
+                ]
+            }
+        except Exception as e:
+            logger.error(f"Error getting collection stats: {e}")
+            return {
+                "isError": True,
+                "content": [
+                    {"type": "text", "text": f"Failed to get collection stats: {str(e)}"}
+                ]
+            }
+
     async def handle_tool_call(
         self, tool_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -2082,6 +2325,13 @@ class ToolHandlers:
                 "get_memory_type_suggestion_guidance": self.handle_get_memory_type_suggestion_guidance,
                 "get_policy_compliance_guidance": self.handle_get_policy_compliance_guidance,
                 "get_policy_violation_recovery_guidance": self.handle_get_policy_violation_recovery_guidance,
+                # Generic Collection Tools
+                "create_collection": self.handle_create_collection,
+                "list_collections": self.handle_list_collections,
+                "add_to_collection": self.handle_add_to_collection,
+                "query_collection": self.handle_query_collection,
+                "delete_collection": self.handle_delete_collection,
+                "get_collection_stats": self.handle_get_collection_stats,
             }
             
             if tool_name in handler_map:
