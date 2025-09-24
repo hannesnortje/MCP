@@ -22,6 +22,8 @@ class GenericMemoryService:
     
     Replaces the rigid global/learned/agent memory types with dynamic
     collections that users can create and organize as needed.
+    
+    Provides backward compatibility methods for legacy MCP server integration.
     """
     
     def __init__(self):
@@ -29,6 +31,13 @@ class GenericMemoryService:
         self.client: Optional[QdrantClient] = None
         self.collection_manager: Optional[CollectionManager] = None
         self.embedding_model = None
+        
+        # Legacy collection mappings for backward compatibility
+        self.legacy_collections = {
+            "global": "global_memory",       # Maps to actual legacy collection
+            "learned": "learned_memory",     # Maps to actual legacy collection
+            "agent": "agent_memory"          # Maps to agent collections
+        }
         self.initialized = False
         self.current_user = "system"  # Current user context
         
@@ -468,71 +477,301 @@ class GenericMemoryService:
             logger.error(f"❌ Failed to get collection stats: {e}")
             return {"success": False, "error": str(e)}
     
-    # Migration & Compatibility
+    # =================================================================
+    # BACKWARD COMPATIBILITY METHODS FOR MCP SERVER
+    # =================================================================
     
-    async def migrate_legacy_collections(self) -> Dict[str, Any]:
+    def add_to_global_memory(
+        self,
+        content: str,
+        category: str = "general",
+        importance: float = 0.5
+    ) -> Dict[str, Any]:
         """
-        Migrate from old global/learned/agent system to new flexible system.
-        
-        Creates equivalent collections with proper metadata and tags.
+        Legacy compatibility method for MCP server.
+        Maps to shared-knowledge collection.
         """
         if not self._ensure_initialized():
             return {"success": False, "error": "Service not initialized"}
             
         try:
-            migrations = []
+            # Use the actual global_memory collection directly
+            collection_name = self.legacy_collections["global"]
             
-            # Define migration mappings
-            legacy_collections = [
-                {
-                    "old_name": "global_memory",
-                    "new_name": "shared-knowledge",
-                    "description": "Shared knowledge and documentation",
-                    "tags": ["global", "shared", "documentation"],
-                    "category": "documentation"
-                },
-                {
-                    "old_name": "learned_memory",
-                    "new_name": "patterns-insights",
-                    "description": "Learned patterns and insights",
-                    "tags": ["learned", "patterns", "insights"],
-                    "category": "knowledge"
-                }
-                # Agent collections handled separately due to dynamic names
-            ]
-            
-            for legacy in legacy_collections:
-                # Check if old collection exists
-                try:
-                    old_info = self.client.get_collection(legacy["old_name"])
-                    if old_info.points_count > 0:
-                        # Create new collection
-                        result = await self.create_collection(
-                            name=legacy["new_name"],
-                            description=legacy["description"],
-                            tags=legacy["tags"],
-                            category=legacy["category"]
-                        )
-                        
-                        if result["success"]:
-                            migrations.append({
-                                "from": legacy["old_name"],
-                                "to": legacy["new_name"],
-                                "status": "created",
-                                "documents": old_info.points_count
-                            })
-                        
-                except Exception as e:
-                    logger.warning(f"Could not migrate {legacy['old_name']}: {e}")
-                    
-            return {
-                "success": True,
-                "migrations": migrations,
-                "message": "Legacy collections migration completed"
+            # Add content with legacy-compatible metadata
+            metadata = {
+                "category": category,
+                "importance": importance,
+                "memory_type": "global",  # For legacy compatibility
+                "legacy_source": "add_to_global_memory"
             }
             
+            result = self._add_memory_sync(
+                collection_name=collection_name,
+                content=content,
+                metadata=metadata
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": (
+                        f"Added to global memory (category: {category})"
+                    ),
+                    "content_hash": result.get("memory_id", "unknown")
+                }
+            else:
+                return result
+                
         except Exception as e:
-            logger.error(f"❌ Migration failed: {e}")
+            logger.error(f"❌ add_to_global_memory failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def add_to_learned_memory(
+        self,
+        content: str,
+        pattern_type: str = "insight",
+        confidence: float = 0.7
+    ) -> Dict[str, Any]:
+        """
+        Legacy compatibility method for MCP server.
+        Maps to learned-patterns collection.
+        """
+        if not self._ensure_initialized():
+            return {"success": False, "error": "Service not initialized"}
+            
+        try:
+            # Use the actual learned_memory collection directly
+            collection_name = self.legacy_collections["learned"]
+            
+            # Add content with legacy-compatible metadata
+            metadata = {
+                "pattern_type": pattern_type,
+                "confidence": confidence,
+                "memory_type": "learned",  # For legacy compatibility
+                "legacy_source": "add_to_learned_memory"
+            }
+            
+            result = self._add_memory_sync(
+                collection_name=collection_name,
+                content=content,
+                metadata=metadata
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": (
+                        f"Added to learned memory (pattern: {pattern_type})"
+                    ),
+                    "content_hash": result.get("memory_id", "unknown")
+                }
+            else:
+                return result
+                
+        except Exception as e:
+            logger.error(f"❌ add_to_learned_memory failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def add_to_agent_memory(
+        self,
+        content: str,
+        agent_id: Optional[str] = None,
+        memory_type: str = "general"
+    ) -> Dict[str, Any]:
+        """
+        Legacy compatibility method for MCP server.
+        Maps to agent-context collection.
+        """
+        if not self._ensure_initialized():
+            return {"success": False, "error": "Service not initialized"}
+            
+        try:
+            # Use provided agent_id or default
+            target_agent_id = agent_id or "default"
+            
+            # For agent memory, use agent-specific collection if it exists
+            # Otherwise, fall back to a general agent collection
+            collection_name = f"agent_specific_memory_{target_agent_id}"
+            
+            # Try to use existing agent-specific collection, otherwise use first available
+            try:
+                # Check if this specific agent collection exists
+                self.client.get_collection(collection_name)
+            except:
+                # Fall back to any available agent collection
+                # This maintains backward compatibility
+                available_collections = self.client.get_collections().collections
+                agent_collections = [
+                    c.name for c in available_collections 
+                    if c.name.startswith("agent_specific_memory_")
+                ]
+                if agent_collections:
+                    collection_name = agent_collections[0]  # Use first available
+                else:
+                    # No agent collection found, create a default one
+                    collection_name = "agent_specific_memory_default"
+            
+            # Add content with legacy-compatible metadata
+            metadata = {
+                "agent_id": target_agent_id,
+                "memory_type": memory_type,
+                "legacy_source": "add_to_agent_memory"
+            }
+            
+            result = self._add_memory_sync(
+                collection_name=collection_name,
+                content=content,
+                metadata=metadata
+            )
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "message": (
+                        f"Added to agent memory (agent: {target_agent_id})"
+                    ),
+                    "content_hash": result.get("memory_id", "unknown")
+                }
+            else:
+                return result
+                
+        except Exception as e:
+            logger.error(f"❌ add_to_agent_memory failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def query_memory(
+        self,
+        query: str,
+        memory_types: Optional[List[str]] = None,
+        limit: int = 10,
+        min_score: float = 0.3
+    ) -> Dict[str, Any]:
+        """
+        Legacy compatibility method for MCP server.
+        Maps memory types to corresponding collections.
+        """
+        if not self._ensure_initialized():
+            return {"success": False, "error": "Service not initialized"}
+            
+        try:
+            # Map legacy memory types to collection names
+            if memory_types is None:
+                memory_types = ["global", "learned", "agent"]
+            
+            collection_names = []
+            for mem_type in memory_types:
+                if mem_type == "global":
+                    collection_names.append("global_memory")
+                elif mem_type == "learned":
+                    collection_names.append("learned_memory")
+                elif mem_type == "agent":
+                    # For agent, search all agent-specific collections
+                    available_collections = self.client.get_collections().collections
+                    agent_collections = [
+                        c.name for c in available_collections 
+                        if c.name.startswith("agent_specific_memory_")
+                    ]
+                    collection_names.extend(agent_collections)
+                else:
+                    logger.warning(f"Unknown legacy memory type: {mem_type}")
+            
+            if not collection_names:
+                return {
+                    "success": False,
+                    "error": (
+                        f"No valid collections found for memory types: "
+                        f"{memory_types}"
+                    )
+                }
+            
+            # Search across collections using sync wrapper
+            result = self._search_memory_sync(
+                collection_names=collection_names,
+                query=query,
+                limit=limit,
+                min_score=min_score
+            )
+            
+            if result["success"]:
+                # Add memory_type to results for legacy compatibility
+                for memory in result["results"]:
+                    collection_name = memory.get("collection", "")
+                    if collection_name == "global_memory":
+                        memory["memory_type"] = "global"
+                    elif collection_name == "learned_memory":
+                        memory["memory_type"] = "learned"
+                    elif collection_name.startswith("agent_specific_memory_"):
+                        memory["memory_type"] = "agent"
+                    else:
+                        memory["memory_type"] = "unknown"
+                
+                return {
+                    "success": True,
+                    "results": result["results"],
+                    "total_results": result["total_results"],
+                    "memory_types_searched": memory_types,
+                    "collections_searched": collection_names
+                }
+            else:
+                return result
+            
+        except Exception as e:
+            logger.error(f"❌ query_memory failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def compare_against_learned_memory(
+        self,
+        situation: str,
+        comparison_type: str = "similarity",
+        limit: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Legacy compatibility method for MCP server.
+        Searches only learned-patterns collection.
+        """
+        if not self._ensure_initialized():
+            return {"success": False, "error": "Service not initialized"}
+            
+        try:
+            collection_name = "learned_memory"  # Use actual collection name
+            
+            # Search learned patterns using sync wrapper
+            result = self._search_memory_sync(
+                collection_names=[collection_name],
+                query=situation,
+                limit=limit,
+                min_score=0.3  # Lower threshold for pattern matching
+            )
+            
+            if result["success"]:
+                # Format results for legacy compatibility
+                patterns = []
+                for memory in result["results"]:
+                    patterns.append({
+                        "content": memory["content"],
+                        "similarity_score": memory["score"],
+                        "pattern_type": memory["metadata"].get(
+                            "pattern_type", "insight"
+                        ),
+                        "confidence": memory["metadata"].get(
+                            "confidence", 0.7
+                        ),
+                        "timestamp": memory["metadata"].get("timestamp")
+                    })
+                
+                return {
+                    "success": True,
+                    "results": patterns,
+                    "total_patterns": len(patterns),
+                    "comparison_type": comparison_type,
+                    "situation_analyzed": situation
+                }
+            else:
+                return result
+                
+        except Exception as e:
+            logger.error(f"❌ compare_against_learned_memory failed: {e}")
             return {"success": False, "error": str(e)}
     
     # Helper methods
@@ -553,6 +792,103 @@ class GenericMemoryService:
         return self.embedding_model.encode(text).tolist()
     
     def _generate_content_hash(self, content: str) -> str:
-        """Generate unique hash for content."""
-        import hashlib
-        return hashlib.sha256(content.encode()).hexdigest()[:16]
+        """Generate unique hash for content as valid UUID."""
+        import uuid
+        # Generate a deterministic UUID5 from content
+        # Use a fixed namespace UUID for consistency
+        namespace = uuid.UUID('12345678-1234-5678-1234-123456789abc')
+        return str(uuid.uuid5(namespace, content))
+    
+    def _add_memory_sync(
+        self,
+        collection_name: str,
+        content: str,
+        metadata: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """Sync wrapper for add_memory method."""
+        try:
+            # Generate embedding
+            embedding = self._embed_text(content)
+            memory_id = self._generate_content_hash(content)
+            
+            # Prepare metadata
+            if metadata is None:
+                metadata = {}
+            
+            metadata.update({
+                "content": content,
+                "timestamp": datetime.now().isoformat(),
+                "added_by": self.current_user
+            })
+            
+            # Create point for storage
+            point = PointStruct(
+                id=memory_id,
+                vector=embedding,
+                payload=metadata
+            )
+            
+            # Store in Qdrant
+            self.client.upsert(
+                collection_name=collection_name,
+                points=[point]
+            )
+            
+            return {
+                "success": True,
+                "memory_id": memory_id,
+                "message": f"Memory added to {collection_name}"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to add memory to {collection_name}: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def _search_memory_sync(
+        self,
+        collection_names: List[str],
+        query: str,
+        limit: int = 10,
+        min_score: float = 0.3
+    ) -> Dict[str, Any]:
+        """Sync wrapper for search_memory method."""
+        try:
+            query_embedding = self._embed_text(query)
+            all_results = []
+            
+            for collection_name in collection_names:
+                try:
+                    results = self.client.search(
+                        collection_name=collection_name,
+                        query_vector=query_embedding,
+                        limit=limit,
+                        score_threshold=min_score
+                    )
+                    
+                    for result in results:
+                        all_results.append({
+                            "content": result.payload.get("content", ""),
+                            "score": result.score,
+                            "collection": collection_name,
+                            "metadata": result.payload
+                        })
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to search {collection_name}: {e}")
+                    continue
+            
+            # Sort by score
+            all_results.sort(key=lambda x: x["score"], reverse=True)
+            
+            return {
+                "success": True,
+                "results": all_results[:limit],
+                "query": query,
+                "total_results": len(all_results)
+            }
+            
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+

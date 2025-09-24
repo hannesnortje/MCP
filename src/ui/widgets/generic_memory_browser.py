@@ -167,16 +167,6 @@ class GenericMemoryBrowserWidget(QWidget):
         
         status_layout.addStretch()
         
-        # Migration button - less prominent
-        self.migrate_btn = QPushButton("Import Legacy")
-        self.migrate_btn.setToolTip(
-            "Import data from old global/learned/agent collections"
-        )
-        self.migrate_btn.clicked.connect(self.migrate_legacy_collections)
-        self.migrate_btn.setMaximumWidth(100)
-        self.migrate_btn.setStyleSheet("QPushButton { font-size: 10px; }")
-        status_layout.addWidget(self.migrate_btn)
-        
         self.refresh_btn = QPushButton("Refresh")
         self.refresh_btn.clicked.connect(self.refresh_data)
         self.refresh_btn.setMaximumWidth(80)
@@ -781,48 +771,6 @@ class GenericMemoryBrowserWidget(QWidget):
         
         self.stats_text.setPlainText(stats_text)
 
-    def migrate_legacy_collections(self):
-        """Migrate from old global/learned/agent system."""
-        if not self.memory_service or not self.memory_service._ensure_initialized():
-            QMessageBox.warning(self, "Error", "Memory service not available")
-            return
-            
-        reply = QMessageBox.question(
-            self, "Migrate Legacy Collections",
-            "This will migrate your old global/learned/agent collections "
-            "to the new flexible system.\n\nContinue?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply != QMessageBox.Yes:
-            return
-        
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-            result = loop.run_until_complete(
-                self.memory_service.migrate_legacy_collections()
-            )
-            loop.close()
-            
-            if result.get("success"):
-                migrations = result.get("migrations", [])
-                message = "Migration completed!\n\n"
-                
-                for migration in migrations:
-                    message += f"• {migration['from']} → {migration['to']} "
-                    message += f"({migration['documents']} documents)\n"
-                
-                QMessageBox.information(self, "Migration Complete", message)
-                self.refresh_collections()
-            else:
-                error_msg = result.get("error", "Unknown error")
-                QMessageBox.critical(self, "Migration Error", error_msg)
-                
-        except Exception as e:
-            logger.error(f"Migration failed: {e}")
-            QMessageBox.critical(self, "Migration Error", str(e))
 
     # Event handlers
     

@@ -58,14 +58,26 @@ class ToolHandlers:
             content, category, importance
         )
         
-        return {
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"Added to global memory: {result['message']}"
-                }
-            ]
-        }
+        if result.get("success"):
+            message = result.get("message", "Content added successfully")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Added to global memory: {message}"
+                    }
+                ]
+            }
+        else:
+            error = result.get("error", "Unknown error")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Failed to add to global memory: {error}"
+                    }
+                ]
+            }
 
     def handle_add_to_learned_memory(
         self, arguments: Dict[str, Any]
@@ -79,14 +91,26 @@ class ToolHandlers:
             content, pattern_type, confidence
         )
         
-        return {
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"Added to learned memory: {result['message']}"
-                }
-            ]
-        }
+        if result.get("success"):
+            message = result.get("message", "Pattern added successfully")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Added to learned memory: {message}"
+                    }
+                ]
+            }
+        else:
+            error = result.get("error", "Unknown error")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Failed to add to learned memory: {error}"
+                    }
+                ]
+            }
 
     def handle_add_to_agent_memory(
         self, arguments: Dict[str, Any]
@@ -100,14 +124,26 @@ class ToolHandlers:
             content, agent_id, memory_type
         )
         
-        return {
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"Added to agent memory: {result['message']}"
-                }
-            ]
-        }
+        if result.get("success"):
+            message = result.get("message", "Content added successfully")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Added to agent memory: {message}"
+                    }
+                ]
+            }
+        else:
+            error = result.get("error", "Unknown error")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Failed to add to agent memory: {error}"
+                    }
+                ]
+            }
 
     def handle_query_memory(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Handle query_memory tool call."""
@@ -130,11 +166,11 @@ class ToolHandlers:
         
         logger.info(
             f"📊 Query results: success={results.get('success')}, "
-            f"total_found={results.get('total_found', 0)}"
+            f"total_results={results.get('total_results', 0)}"
         )
         
         if results.get("success", False):
-            memories = results.get("memories", [])
+            memories = results.get("results", [])
             response_text = (
                 f"Found {len(memories)} relevant memories:\n\n"
             )
@@ -199,7 +235,7 @@ class ToolHandlers:
         )
         
         if results.get("success", False):
-            patterns = results.get("patterns", [])
+            patterns = results.get("results", [])
             response_text = (
                 f"Found {len(patterns)} similar learned patterns:\n\n"
             )

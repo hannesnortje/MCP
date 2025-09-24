@@ -171,7 +171,52 @@ For each step:
 - Confirm progress indicators show properly
 - Test error handling during import/export
 
-## Step 10: UI Polish and Documentation
+## Step 10: Complete Generic MCP Tools Integration
+
+**Branch name:** `feature/generic-mcp-tools`
+
+### Implementation:
+1. Add new MCP tools that expose full generic collection capabilities:
+   - `create_collection` - Create new custom collections
+   - `list_collections` - List all available collections
+   - `add_to_collection` - Add content to any collection
+   - `query_collection` - Search within specific collections
+   - `delete_collection` - Remove collections
+   - `get_collection_stats` - Get collection statistics
+2. Update `mcp_server.py` to include new tool definitions
+3. Add corresponding handlers in `tool_handlers.py`
+4. Ensure new tools work alongside legacy tools for backward compatibility
+
+### Testing:
+- Test new tools via MCP protocol
+- Verify backward compatibility with existing legacy tools
+- Confirm Cursor can use both old and new tools
+- Test collection management operations
+- Validate error handling for new tools
+
+## Step 11: Legacy Data Migration to Generic System
+
+**Branch name:** `feature/legacy-data-migration`
+
+### Implementation:
+1. Create migration utilities to convert existing Qdrant data:
+   - Migrate `global_memory` collection to `shared-knowledge`
+   - Migrate `learned_memory` collection to `learned-patterns`
+   - Migrate `agent_specific_memory` collections to `agent-context`
+   - Preserve all metadata and maintain data integrity
+2. Implement automatic migration on server startup
+3. Add manual migration tools for advanced users
+4. Create backup and rollback capabilities
+5. Update collection metadata to match new generic structure
+
+### Testing:
+- Test migration with existing data
+- Verify data integrity after migration
+- Confirm all migrated data is searchable
+- Test rollback functionality
+- Validate that UI works with migrated data
+
+## Step 12: UI Polish and Documentation
 
 **Branch name:** `feature/ui-polish`
 
@@ -181,6 +226,7 @@ For each step:
 3. Create help documentation
 4. Add tooltips and user guidance
 5. Update project documentation with UI usage instructions
+6. Document new generic collection features
 
 ### Testing:
 - Verify visual appearance across platforms
@@ -231,9 +277,11 @@ git branch -d feature/branch-name
 - Steps 1-3: 1-2 days
 - Steps 4-6: 2-3 days
 - Steps 7-8: 1-2 days
-- Steps 9-10: 1-2 days
+- Steps 9-10: 1-2 days (Generic MCP Tools)
+- Step 11: 1-2 days (Legacy Data Migration)
+- Step 12: 1-2 days (UI Polish)
 
-Total estimated time: 5-9 days depending on complexity encountered during implementation.
+Total estimated time: 7-13 days depending on complexity encountered during implementation.
 
 ---
 

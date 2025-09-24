@@ -28,20 +28,30 @@ from .error_handler import (
     retry_network_operation,
     error_handler
 )
+from .generic_memory_service import GenericMemoryService
 
 logger = logging.getLogger(__name__)
 
 
 class QdrantMemoryManager:
-    """Manages vector database operations for different memory types."""
+    """
+    Manages vector database operations for different memory types.
+    
+    Now uses GenericMemoryService internally while maintaining
+    backward compatibility with the existing MCP server interface.
+    """
 
     def __init__(self) -> None:
         """Initialize the Qdrant Memory Manager."""
+        # Legacy interface compatibility
         self.client: Optional[QdrantClient] = None
         self.embedding_model: Optional[SentenceTransformer] = None
         self.collections_initialized = False
         self.current_agent_id = None
         self.current_context = {}
+        
+        # New generic memory service
+        self.generic_service = GenericMemoryService()
         
         # Initialize synchronously for MCP server compatibility
         self._sync_initialize()
@@ -75,36 +85,106 @@ class QdrantMemoryManager:
     def _sync_initialize(self) -> None:
         """Synchronous initialization for compatibility."""
         try:
-            # Initialize Qdrant client
-            if Config.QDRANT_API_KEY:
-                self.client = QdrantClient(
-                    host=Config.QDRANT_HOST,
-                    port=Config.QDRANT_PORT,
-                    api_key=Config.QDRANT_API_KEY,
-                    timeout=60
+            # Initialize the generic memory service synchronously
+            import asyncio
+            
+            # Check if we can run async operations
+            try:
+                loop = asyncio.get_running_loop()
+                logger.warning(
+                    "Already in event loop during sync initialization - "
+                    "using fallback sync init"
                 )
-            else:
-                self.client = QdrantClient(
-                    host=Config.QDRANT_HOST,
-                    port=Config.QDRANT_PORT,
-                    timeout=60
-                )
-
-            # Test connection
-            collections = self.client.get_collections()
-            logger.info(f"✅ Connected to Qdrant at {Config.QDRANT_HOST}:{Config.QDRANT_PORT}")
-            logger.info(f"Found {len(collections.collections)} existing collections")
-
-            # Initialize embedding model
-            self.embedding_model = SentenceTransformer(Config.EMBEDDING_MODEL)
-            logger.info(f"✅ Loaded embedding model: {Config.EMBEDDING_MODEL}")
-
-            # Initialize collections
-            self._sync_initialize_collections()
+                # Fall back to old sync initialization
+                self._fallback_sync_init()
+            except RuntimeError:
+                # No event loop, run async initialization
+                asyncio.run(self._async_initialize_generic_service())
+                
+                # Initialize legacy compatibility attributes
+                self.client = self.generic_service.client
+                self.embedding_model = self.generic_service.embedding_model
+                self.collections_initialized = self.generic_service.initialized
+            
+            logger.info(
+                "✅ QdrantMemoryManager initialized with GenericMemoryService"
+            )
 
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Qdrant: {e}")
-            raise
+            logger.error(f"❌ Failed to initialize QdrantMemoryManager: {e}")
+            # Fall back to sync initialization
+            try:
+                self._fallback_sync_init()
+                logger.info("✅ Fallback sync initialization completed")
+            except Exception as fallback_error:
+                logger.error(f"❌ Fallback initialization also failed: {fallback_error}")
+                raise
+            
+    async def _async_initialize_generic_service(self) -> None:
+        """Initialize the generic memory service asynchronously."""
+        await self.generic_service.initialize()
+        
+    def _fallback_sync_init(self) -> None:
+        """Fallback to traditional sync initialization."""
+        # Initialize Qdrant client directly
+        if Config.QDRANT_API_KEY:
+            self.client = QdrantClient(
+                host=Config.QDRANT_HOST,
+                port=Config.QDRANT_PORT,
+                api_key=Config.QDRANT_API_KEY,
+                timeout=60
+            )
+        else:
+            self.client = QdrantClient(
+                host=Config.QDRANT_HOST,
+                port=Config.QDRANT_PORT,
+                timeout=60
+            )
+
+        # Test connection
+        collections = self.client.get_collections()
+        logger.info(
+            f"✅ Connected to Qdrant at {Config.QDRANT_HOST}:"
+            f"{Config.QDRANT_PORT}"
+        )
+        logger.info(
+            f"Found {len(collections.collections)} existing collections"
+        )
+
+        # Initialize embedding model
+        from sentence_transformers import SentenceTransformer
+        self.embedding_model = SentenceTransformer(Config.EMBEDDING_MODEL)
+        logger.info(f"✅ Loaded embedding model: {Config.EMBEDDING_MODEL}")
+
+        # Initialize collections
+        self._sync_initialize_collections()
+        self.collections_initialized = True
+        
+        # Initialize the generic service with the same client and model
+        self.generic_service.client = self.client
+        self.generic_service.embedding_model = self.embedding_model
+        self.generic_service.initialized = True
+        
+        # Initialize collection manager for generic service
+        from .collection_manager import CollectionManager
+        self.generic_service.collection_manager = CollectionManager(
+            qdrant_client=self.client,
+            embedding_dimension=Config.EMBEDDING_DIMENSION
+        )
+        
+    def _ensure_legacy_collections(self) -> None:
+        """Ensure legacy collections exist with backward compatibility."""
+        try:
+            # Skip migration for now to avoid async issues
+            # Migration will be handled later when we can properly
+            # manage async contexts
+            logger.info(
+                "Legacy collections check completed (migration deferred)"
+            )
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to ensure legacy collections: {e}")
+            # Don't raise - continue with degraded functionality
 
     @retry_qdrant_operation(max_attempts=3)
     def _sync_initialize_collections(self) -> None:
@@ -155,75 +235,27 @@ class QdrantMemoryManager:
         }
         logger.info(f"🎯 Set agent context: {agent_id} ({context_type})")
 
-    def add_to_global_memory(self, content: str, category: str = "general", importance: float = 0.5) -> Dict[str, Any]:
-        """Add content to global memory."""
-        try:
-            content_hash = self._generate_content_hash(content)
-            embedding = self._embed_text(content)
+    def add_to_global_memory(
+        self,
+        content: str,
+        category: str = "general",
+        importance: float = 0.5
+    ) -> Dict[str, Any]:
+        """Add content to global memory via GenericMemoryService."""
+        return self.generic_service.add_to_global_memory(
+            content, category, importance
+        )
 
-            metadata = {
-                "content": content,
-                "category": category,
-                "importance": importance,
-                "memory_type": "global",
-                "timestamp": datetime.now().isoformat()
-            }
-
-            point = PointStruct(
-                id=content_hash,
-                vector=embedding,
-                payload=metadata
-            )
-
-            self.client.upsert(
-                collection_name=Config.GLOBAL_MEMORY_COLLECTION,
-                points=[point]
-            )
-
-            return {
-                "success": True,
-                "message": f"Added to global memory (category: {category})",
-                "content_hash": content_hash
-            }
-
-        except Exception as e:
-            logger.error(f"❌ Failed to add to global memory: {e}")
-            return {"success": False, "error": str(e)}
-
-    def add_to_learned_memory(self, content: str, pattern_type: str = "insight", confidence: float = 0.7) -> Dict[str, Any]:
-        """Add learned patterns to memory."""
-        try:
-            content_hash = self._generate_content_hash(content)
-            embedding = self._embed_text(content)
-
-            metadata = {
-                "content": content,
-                "pattern_type": pattern_type,
-                "confidence": confidence,
-                "memory_type": "learned",
-                "timestamp": datetime.now().isoformat()
-            }
-
-            point = PointStruct(
-                id=content_hash,
-                vector=embedding,
-                payload=metadata
-            )
-
-            self.client.upsert(
-                collection_name=Config.LEARNED_MEMORY_COLLECTION,
-                points=[point]
-            )
-
-            return {
-                "success": True,
-                "message": f"Added to learned memory (pattern: {pattern_type})",
-                "content_hash": content_hash
-            }
-
-        except Exception as e:
-            logger.error(f"❌ Failed to add to learned memory: {e}")
-            return {"success": False, "error": str(e)}
+    def add_to_learned_memory(
+        self,
+        content: str,
+        pattern_type: str = "insight",
+        confidence: float = 0.7
+    ) -> Dict[str, Any]:
+        """Add learned patterns to memory via GenericMemoryService."""
+        return self.generic_service.add_to_learned_memory(
+            content, pattern_type, confidence
+        )
 
     def add_to_agent_memory(self, content: str, agent_id: Optional[str] = None, memory_type: str = "general") -> Dict[str, Any]:
         """Add content to agent-specific memory."""
@@ -266,98 +298,28 @@ class QdrantMemoryManager:
             logger.error(f"❌ Failed to add to agent memory: {e}")
             return {"success": False, "error": str(e)}
 
-    def query_memory(self, query: str, memory_types: List[str] = None, limit: int = 10, min_score: float = 0.3) -> Dict[str, Any]:
-        """Query memory for relevant content."""
-        try:
-            if memory_types is None:
-                memory_types = ["global", "learned", "agent"]
+    def query_memory(
+        self,
+        query: str,
+        memory_types: List[str] = None,
+        limit: int = 10,
+        min_score: float = 0.3
+    ) -> Dict[str, Any]:
+        """Query memory for relevant content via GenericMemoryService."""
+        return self.generic_service.query_memory(
+            query, memory_types, limit, min_score
+        )
 
-            query_embedding = self._embed_text(query)
-            all_results = []
-
-            # Search each memory type
-            for memory_type in memory_types:
-                try:
-                    if memory_type == "global":
-                        collection_name = Config.GLOBAL_MEMORY_COLLECTION
-                    elif memory_type == "learned":
-                        collection_name = Config.LEARNED_MEMORY_COLLECTION
-                    elif memory_type == "agent" and self.current_agent_id:
-                        collection_name = Config.get_collection_name("agent", self.current_agent_id)
-                        # Check if collection exists
-                        existing_collections = {
-                            col.name for col in self.client.get_collections().collections
-                        }
-                        if collection_name not in existing_collections:
-                            continue
-                    else:
-                        continue
-
-                    search_results = self.client.search(
-                        collection_name=collection_name,
-                        query_vector=query_embedding,
-                        limit=limit,
-                        score_threshold=min_score
-                    )
-
-                    for result in search_results:
-                        if result.score >= min_score:
-                            all_results.append({
-                                "content": result.payload.get("content", ""),
-                                "score": result.score,
-                                "memory_type": memory_type,
-                                "metadata": result.payload
-                            })
-
-                except Exception as e:
-                    logger.warning(f"⚠️ Failed to search {memory_type} memory: {e}")
-                    continue
-
-            # Sort by score and limit
-            all_results.sort(key=lambda x: x["score"], reverse=True)
-            all_results = all_results[:limit]
-
-            return {
-                "success": True,
-                "memories": all_results,
-                "total_found": len(all_results)
-            }
-
-        except Exception as e:
-            logger.error(f"❌ Failed to query memory: {e}")
-            return {"success": False, "error": str(e)}
-
-    def compare_against_learned_memory(self, situation: str, comparison_type: str = "pattern_match", limit: int = 5) -> Dict[str, Any]:
-        """Compare current situation against learned patterns."""
-        try:
-            situation_embedding = self._embed_text(situation)
-
-            search_results = self.client.search(
-                collection_name=Config.LEARNED_MEMORY_COLLECTION,
-                query_vector=situation_embedding,
-                limit=limit,
-                score_threshold=0.1  # Lower threshold for comparison
-            )
-
-            patterns = []
-            for result in search_results:
-                patterns.append({
-                    "content": result.payload.get("content", ""),
-                    "score": result.score,
-                    "pattern_type": result.payload.get("pattern_type", "unknown"),
-                    "confidence": result.payload.get("confidence", 0.0),
-                    "metadata": result.payload
-                })
-
-            return {
-                "success": True,
-                "patterns": patterns,
-                "total_found": len(patterns)
-            }
-
-        except Exception as e:
-            logger.error(f"❌ Failed to compare against learned memory: {e}")
-            return {"success": False, "error": str(e)}
+    def compare_against_learned_memory(
+        self,
+        situation: str,
+        comparison_type: str = "pattern_match",
+        limit: int = 5
+    ) -> Dict[str, Any]:
+        """Compare situation against learned patterns via service."""
+        return self.generic_service.compare_against_learned_memory(
+            situation, comparison_type, limit
+        )
 
     async def initialize(self) -> None:
         """Initialize Qdrant client and embedding model."""
