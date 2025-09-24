@@ -466,11 +466,32 @@ class CollectionManager:
                 metadata_dict = point.payload["metadata"]
                 
                 # Reconstruct CollectionInfo object
+                metadata_raw = metadata_dict["metadata"]
+                
+                # Reconstruct permissions properly
+                permissions_raw = metadata_raw["permissions"]
+                permissions = CollectionPermissions(
+                    read=permissions_raw["read"],
+                    write=permissions_raw["write"],
+                    admin=permissions_raw["admin"]
+                )
+                
+                # Reconstruct metadata with proper permissions
+                metadata = CollectionMetadata(
+                    created_at=metadata_raw["created_at"],
+                    created_by=metadata_raw["created_by"],
+                    permissions=permissions,
+                    category=metadata_raw.get("category"),
+                    project=metadata_raw.get("project"),
+                    retention_days=metadata_raw.get("retention_days"),
+                    last_updated=metadata_raw.get("last_updated")
+                )
+                
                 collection_info = CollectionInfo(
                     name=metadata_dict["name"],
                     description=metadata_dict["description"],
                     tags=metadata_dict["tags"],
-                    metadata=CollectionMetadata(**metadata_dict["metadata"]),
+                    metadata=metadata,
                     stats=metadata_dict["stats"]
                 )
                 
@@ -503,11 +524,34 @@ class CollectionManager:
             collections = []
             for point in results[0]:
                 metadata_dict = point.payload["metadata"]
+                
+                # Reconstruct metadata properly
+                metadata_raw = metadata_dict["metadata"]
+                
+                # Reconstruct permissions properly
+                permissions_raw = metadata_raw["permissions"]
+                permissions = CollectionPermissions(
+                    read=permissions_raw["read"],
+                    write=permissions_raw["write"],
+                    admin=permissions_raw["admin"]
+                )
+                
+                # Reconstruct metadata with proper permissions
+                metadata = CollectionMetadata(
+                    created_at=metadata_raw["created_at"],
+                    created_by=metadata_raw["created_by"],
+                    permissions=permissions,
+                    category=metadata_raw.get("category"),
+                    project=metadata_raw.get("project"),
+                    retention_days=metadata_raw.get("retention_days"),
+                    last_updated=metadata_raw.get("last_updated")
+                )
+                
                 collection_info = CollectionInfo(
                     name=metadata_dict["name"],
                     description=metadata_dict["description"],
                     tags=metadata_dict["tags"],
-                    metadata=CollectionMetadata(**metadata_dict["metadata"]),
+                    metadata=metadata,
                     stats=metadata_dict["stats"]
                 )
                 collections.append(collection_info)

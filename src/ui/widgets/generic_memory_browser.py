@@ -11,10 +11,10 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLineEdit, QPushButton,
     QComboBox, QSpinBox, QLabel, QTreeWidget, QTreeWidgetItem, QTextEdit,
     QTabWidget, QTableWidget, QTableWidgetItem, QFrame, QMessageBox,
-    QCheckBox, QFormLayout, QDialog
+    QCheckBox, QFormLayout, QDialog, QMenu
 )
-from PySide6.QtCore import QTimer, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import QTimer, Signal, Qt
+from PySide6.QtGui import QFont, QAction
 
 # Import the new generic memory service
 from ..services import MemoryService
@@ -300,6 +300,13 @@ class GenericMemoryBrowserWidget(QWidget):
         self.collections_tree.setHeaderLabels([
             "Collection", "Description", "Documents", "Category", "Tags"
         ])
+        
+        # Enable context menu
+        self.collections_tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.collections_tree.customContextMenuRequested.connect(
+            self.show_collections_context_menu
+        )
+        
         collections_layout.addWidget(self.collections_tree)
         
         # Collection actions
@@ -831,4 +838,75 @@ class GenericMemoryBrowserWidget(QWidget):
                 
         except Exception as e:
             logger.error(f"Failed to delete collection: {e}")
+            QMessageBox.critical(self, "Error", str(e))
+
+    def show_collections_context_menu(self, position):
+        """Show context menu for collections tree."""
+        item = self.collections_tree.itemAt(position)
+        if not item:
+            return
+            
+        # Get collection name from the first column
+        collection_name = item.text(0)
+        if not collection_name:
+            return
+            
+        # Create context menu
+        context_menu = QMenu(self)
+        
+        # Delete action
+        delete_action = QAction("Delete Collection", self)
+        delete_action.triggered.connect(
+            lambda: self.delete_collection_from_tree(collection_name)
+        )
+        context_menu.addAction(delete_action)
+        
+        # Show the context menu
+        context_menu.exec_(self.collections_tree.mapToGlobal(position))
+
+    def delete_collection_from_tree(self, collection_name):
+        """Delete a collection selected from the tree context menu."""
+        if not collection_name:
+            QMessageBox.warning(self, "Error", "No collection selected")
+            return
+        
+        reply = QMessageBox.question(
+            self, "Delete Collection",
+            f"Are you sure you want to delete collection '{collection_name}'?\n\n"
+            "This will permanently delete all memories in this collection.",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        if not self.memory_service or not self.memory_service._ensure_initialized():
+            QMessageBox.warning(self, "Error", "Memory service not available")
+            return
+        
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            result = loop.run_until_complete(
+                self.memory_service.delete_collection(
+                    name=collection_name, confirm=True
+                )
+            )
+            loop.close()
+            
+            if result.get("success"):
+                QMessageBox.information(
+                    self, "Success", f"Collection '{collection_name}' deleted"
+                )
+                self.refresh_collections()
+                self.collection_deleted.emit(collection_name)
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                QMessageBox.critical(
+                    self, "Error", f"Failed to delete: {error_msg}"
+                )
+                
+        except Exception as e:
+            logger.error(f"Failed to delete collection from tree: {e}")
             QMessageBox.critical(self, "Error", str(e))
