@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram name="MCP + Qdrant Reference-Based Document Architecture" id="mcp-qdrant-ref-arch">
-        <mxGraphModel dx="1261" dy="842" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1400" math="0" shadow="0">
+        <mxGraphModel dx="893" dy="597" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1400" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -11,10 +11,10 @@
                     <mxGeometry x="910" y="600" width="280" height="180" as="geometry"/>
                 </mxCell>
                 <mxCell id="collections-title" value="🗄️ Qdrant Collections" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#9673a6;" parent="1" vertex="1">
-                    <mxGeometry x="120" y="301" width="200" height="30" as="geometry"/>
+                    <mxGeometry x="122" y="305" width="200" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="memory-collections-title" value="💾 Enhanced Memory Collections (Content Storage)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#82b366;" parent="1" vertex="1">
-                    <mxGeometry x="130" y="331" width="300" height="20" as="geometry"/>
+                    <mxGeometry x="132" y="335" width="300" height="20" as="geometry"/>
                 </mxCell>
                 <mxCell id="global-memory-collection" value="🌍 global_memory&lt;br&gt;&lt;br&gt;EXISTING: content, timestamp, category, importance, agent_id&lt;br&gt;&lt;br&gt;NEW FIELDS:&lt;br&gt;• source_doc_id (UUID, optional)&lt;br&gt;• source_doc_version (int, optional)&lt;br&gt;• chunk_index (int, optional)&lt;br&gt;• is_current (bool, default true)&lt;br&gt;• content_hash (SHA-256, optional)&lt;br&gt;&lt;br&gt;⚡ Content lives here!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" parent="1" vertex="1">
                     <mxGeometry x="130" y="356" width="200" height="180" as="geometry"/>
@@ -320,6 +320,26 @@
                         <Array as="points">
                             <mxPoint x="440" y="560"/>
                             <mxPoint x="711" y="560"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="13" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+                    <mxGeometry x="70" y="880" width="640" height="310" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" value="" style="endArrow=classic;html=1;exitX=0.291;exitY=1.019;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.585;entryY=1.291;entryDx=0;entryDy=0;entryPerimeter=0;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=3;" edge="1" parent="1" source="mcp-update" target="memory-collections-title">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="540" y="430" as="sourcePoint"/>
+                        <mxPoint x="590" y="380" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="16" value="" style="endArrow=classic;html=1;exitX=0.081;exitY=0.982;exitDx=0;exitDy=0;exitPerimeter=0;entryX=-0.003;entryY=0.114;entryDx=0;entryDy=0;entryPerimeter=0;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=3;" edge="1" parent="1" source="mcp-update" target="documents-collection">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="540" y="500" as="sourcePoint"/>
+                        <mxPoint x="590" y="450" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="270" y="310"/>
+                            <mxPoint x="110" y="310"/>
+                            <mxPoint x="110" y="631"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>
