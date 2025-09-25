@@ -1,0 +1,200 @@
+<mxfile host="65bd71144e">
+    <diagram name="MCP + Qdrant Memory with Dual-Link Markdown Architecture" id="mcp-qdrant-arch">
+        <mxGraphModel dx="2137" dy="716" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="🔄 MCP + Qdrant Memory with Dual-Link Markdown Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1f5582;" parent="1" vertex="1">
+                    <mxGeometry x="200" y="10" width="1400" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="qdrant-core" value="🧠 Qdrant Vector Database&lt;br&gt;THE SINGLE SOURCE OF TRUTH&lt;br&gt;&lt;br&gt;All knowledge lives here" style="ellipse;whiteSpace=wrap;html=1;fontSize=16;fontStyle=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=4;" parent="1" vertex="1">
+                    <mxGeometry x="800" y="600" width="280" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="collections-title" value="🗄️ Qdrant Collections" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="200" y="270" width="200" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="documents-collection" value="📊 documents&lt;br&gt;&lt;br&gt;• doc_id (UUID, primary)&lt;br&gt;• title, full_md&lt;br&gt;• version (monotonic)&lt;br&gt;• tags, aliases&lt;br&gt;• links_out (doc://&lt;id&gt;)&lt;br&gt;• links_dual (GitHub+Local)&lt;br&gt;• created_at, updated_at" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="210" y="320" width="180" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="doc-versions-collection" value="📚 doc_versions&lt;br&gt;&lt;br&gt;• doc_id, version&lt;br&gt;• full_md&lt;br&gt;• change_note&lt;br&gt;• aliases_snapshot&lt;br&gt;• links_out_snapshot&lt;br&gt;• timestamps&lt;br&gt;⚡ Immutable history" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="210" y="640" width="180" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="chunks-collection" value="🔍 chunks&lt;br&gt;&lt;br&gt;• doc_id, version&lt;br&gt;• chunk_ix&lt;br&gt;• plain_text&lt;br&gt;• snippet_md&lt;br&gt;• headings, tags&lt;br&gt;• embeddings&lt;br&gt;⚡ Semantic retrieval" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="210" y="480" width="180" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="mcp-server-title" value="🛠️ MCP Server (Cursor Integration)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="30" width="400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cursor-agent" value="🤖 Cursor Agent&lt;br&gt;&lt;br&gt;Uses MCP tools to:&lt;br&gt;• Create documents&lt;br&gt;• Update knowledge&lt;br&gt;• Search content&lt;br&gt;• Navigate links&lt;br&gt;• Import legacy docs" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="70" width="200" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="📝 memory.doc.create&lt;br&gt;&lt;br&gt;Create new doc in Qdrant&lt;br&gt;Export .md with dual-links" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="260" y="80" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="write-through-title" value="📤 Write-Through Export with Dual Links" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="1240" y="80" width="400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="local-repo" value="📁 Local Repository&lt;br&gt;&lt;br&gt;/docs/pdca/overview.md&lt;br&gt;/docs/cmmi/template.md&lt;br&gt;/knowledge/index.md&lt;br&gt;&lt;br&gt;Each .md starts with:&lt;br&gt;[GitHub](url) | [Local](path)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="670" y="110" width="200" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="dual-link-example" value="📄 Dual-Link Example&lt;br&gt;&lt;br&gt;[GitHub](https://github.com/org/repo/blob/abc123/docs/pdca/overview.md) | [Local](./docs/pdca/overview.md)&lt;br&gt;&lt;br&gt;# PDCA Overview&lt;br&gt;This document describes the PDCA workflow...&lt;br&gt;&lt;br&gt;⚡ Always both links in every .md file!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#e6ffcc;strokeColor=#82b366;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1230" y="140" width="420" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="crawler-title" value="🕷️ Crawler (Bootstrap / Legacy Sync)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="880" width="400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="crawler-process" value="🎯 Crawler Process&lt;br&gt;&lt;br&gt;1. Start from README.md (local/GitHub)&lt;br&gt;2. Extract links:&lt;br&gt;   • Dual-link rows: record both aliases&lt;br&gt;   • Single .md links: resolve later&lt;br&gt;3. Create Qdrant documents for each .md&lt;br&gt;4. Resolve links → internal URIs (doc://id)&lt;br&gt;&lt;br&gt;⚡ Makes existing .md part of Qdrant" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="990" width="300" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="seed-files" value="🌱 Seed Files&lt;br&gt;&lt;br&gt;• README.md&lt;br&gt;• index.md&lt;br&gt;• Any starting .md&lt;br&gt;&lt;br&gt;Contains links to other&lt;br&gt;knowledge documents" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="540" y="850" width="140" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="legacy-docs" value="📚 Legacy Docs&lt;br&gt;&lt;br&gt;Existing .md scattered&lt;br&gt;across repo:&lt;br&gt;• components/&lt;br&gt;• docs/&lt;br&gt;• scrum.pmo/&lt;br&gt;• recovery.analysis/&lt;br&gt;&lt;br&gt;Get imported into Qdrant" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="540" y="1000" width="140" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="data-flows-title" value="🔄 Data Flows" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#1f5582;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="840" width="200" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="new-knowledge-flow" value="✨ New Knowledge Flow&lt;br&gt;&lt;br&gt;Agent → memory.doc.create&lt;br&gt;↓&lt;br&gt;Qdrant write → chunks&lt;br&gt;↓&lt;br&gt;Export .md with dual links&lt;br&gt;↓&lt;br&gt;Commit/push → aliases updated" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#e6ffcc;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="990" y="900" width="180" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="update-knowledge-flow" value="🔄 Update Knowledge Flow&lt;br&gt;&lt;br&gt;Agent → memory.doc.update&lt;br&gt;(with prev_version=N)&lt;br&gt;↓&lt;br&gt;Qdrant version++ → reindex&lt;br&gt;↓&lt;br&gt;Overwrite .md with dual links&lt;br&gt;↓&lt;br&gt;Commit/push → aliases updated" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="1190" y="900" width="180" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="retrieve-knowledge-flow" value="🔍 Retrieve Knowledge Flow&lt;br&gt;&lt;br&gt;Agent → memory.search&lt;br&gt;↓&lt;br&gt;Top chunks returned&lt;br&gt;&lt;br&gt;Agent → memory.doc.get&lt;br&gt;↓&lt;br&gt;Authoritative Markdown" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="1390" y="900" width="180" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="import-legacy-flow" value="🕷️ Import Legacy Flow&lt;br&gt;&lt;br&gt;Agent → memory.import&lt;br&gt;{ seed: README.md }&lt;br&gt;↓&lt;br&gt;Crawler BFS through links&lt;br&gt;↓&lt;br&gt;Qdrant ingest → dual-links&lt;br&gt;preserved → links resolved" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="1590" y="900" width="180" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="guarantees-title" value="⚙️ System Guarantees" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#1f5582;" parent="1" vertex="1">
+                    <mxGeometry x="1240" y="280" width="200" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="guarantees-list" value="✅ Qdrant = single source of truth&lt;br&gt;✅ .md files = mirrors with dual-link headers&lt;br&gt;✅ Immutable history in doc_versions&lt;br&gt;✅ Conflict-safe updates (require prev_version)&lt;br&gt;✅ Hybrid search (BM25 + embeddings)&lt;br&gt;✅ Graph navigation (links_out/in)&lt;br&gt;✅ Backup/export safety net&lt;br&gt;✅ Dual aliases: GitHub + Local always" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1240" y="320" width="400" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="typical-workflow-title" value="🚀 Typical Workflow in Cursor" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="1240" y="500" width="300" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="workflow-steps" value="1️⃣ Create doc: memory.doc.create&lt;br&gt;   → File written locally + GitHub with dual-link header&lt;br&gt;&lt;br&gt;2️⃣ Update doc: memory.doc.update&lt;br&gt;   → New version in Qdrant, updated .md committed&lt;br&gt;&lt;br&gt;3️⃣ Import legacy: memory.import&lt;br&gt;   → Crawler follows links, imports into Qdrant&lt;br&gt;&lt;br&gt;4️⃣ Search &amp; navigate: memory.search + graph.links" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1240" y="540" width="400" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-cursor-to-mcp" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=3;" parent="1" source="cursor-agent" target="mcp-create" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-mcp-to-qdrant1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;strokeWidth=3;" parent="1" source="mcp-create" target="documents-collection" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="360" y="400"/>
+                            <mxPoint x="410" y="400"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-mcp-to-qdrant2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;strokeWidth=3;" parent="1" source="mcp-update" target="doc-versions-collection" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="360" y="400"/>
+                            <mxPoint x="610" y="400"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-mcp-to-qdrant3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;strokeWidth=3;" parent="1" source="mcp-search" target="chunks-collection" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="540" y="400"/>
+                            <mxPoint x="810" y="400"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-crawler-to-qdrant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=3;dashed=1;exitX=0.994;exitY=0.857;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="crawler-process" target="qdrant-core" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="430" y="1127"/>
+                            <mxPoint x="430" y="1170"/>
+                            <mxPoint x="940" y="1170"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-seed-to-crawler" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;strokeWidth=2;" parent="1" source="seed-files" target="crawler-process" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="510" y="910"/>
+                            <mxPoint x="510" y="1030"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-legacy-to-crawler" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=2;" parent="1" source="legacy-docs" target="crawler-process" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="collections-to-core" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;dashed=1;" parent="1" source="documents-collection" target="qdrant-core" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="670" y="420"/>
+                            <mxPoint x="670" y="670"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="collections-to-core2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;dashed=1;" parent="1" source="doc-versions-collection" target="qdrant-core" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="700" y="710"/>
+                            <mxPoint x="700" y="710"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="collections-to-core3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;dashed=1;" parent="1" source="chunks-collection" target="qdrant-core" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="595" y="580"/>
+                            <mxPoint x="595" y="690"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="architecture-summary" value="🎯 Architecture Summary&lt;br&gt;&lt;br&gt;• Qdrant = The Truth (documents, versions, chunks)&lt;br&gt;• MCP Server = Interface (7 tools for agents)&lt;br&gt;• Write-through export = .md mirrors with dual links&lt;br&gt;• Crawler = Bootstrap from existing .md files&lt;br&gt;• Dual-link rule = Every .md has GitHub + Local links&lt;br&gt;• Graph resolution = Internal doc:// URIs for navigation" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f0f8ff;strokeColor=#1f5582;strokeWidth=3;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="1220" width="480" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-legend" value="🎨 Flow Legend&lt;br&gt;&lt;br&gt;🔴 Cursor → MCP tools&lt;br&gt;🟡 MCP → Qdrant collections&lt;br&gt;🟢 Search/retrieval flows&lt;br&gt;🟣 Qdrant → Export (write-through)&lt;br&gt;🟠 Local → GitHub sync&lt;br&gt;🟤 Crawler import (dashed)&lt;br&gt;⚫ Collection membership (dashed)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="1220" width="220" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=4;" edge="1" parent="1" source="qdrant-core" target="github-repo">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="950" y="500"/>
+                            <mxPoint x="1060" y="500"/>
+                        </Array>
+                        <mxPoint x="940" y="600" as="sourcePoint"/>
+                        <mxPoint x="1030" y="180" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="github-repo" value="☁️ GitHub Repository&lt;br&gt;&lt;br&gt;github.com/org/repo/blob/&lt;br&gt;• /docs/pdca/overview.md&lt;br&gt;• /docs/cmmi/template.md&lt;br&gt;• /knowledge/index.md&lt;br&gt;&lt;br&gt;Same dual-link headers" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="960" y="110" width="200" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=4;entryX=0.458;entryY=0.991;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" target="local-repo">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="910" y="500"/>
+                            <mxPoint x="762" y="500"/>
+                        </Array>
+                        <mxPoint x="910" y="601" as="sourcePoint"/>
+                        <mxPoint x="1020" y="251" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="7" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+                    <mxGeometry x="60" y="840" width="680" height="350" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="20" width="430" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+                    <mxGeometry x="190" y="255" width="230" height="545" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+                    <mxGeometry x="970" y="825" width="820" height="245" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=1 4;" vertex="1" parent="1">
+                    <mxGeometry x="1210" y="60" width="470" height="660" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
