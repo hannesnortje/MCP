@@ -1,0 +1,329 @@
+<mxfile host="65bd71144e">
+    <diagram name="MCP + Qdrant Reference-Based Document Architecture" id="mcp-qdrant-ref-arch">
+        <mxGraphModel dx="1261" dy="842" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="🔄 MCP + Qdrant Reference-Based Document Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1f5582;" parent="1" vertex="1">
+                    <mxGeometry x="200" y="10" width="1400" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="qdrant-core" value="🧠 Qdrant Vector Database&lt;br&gt;THE SINGLE SOURCE OF TRUTH&lt;br&gt;&lt;br&gt;Content in memory, metadata in documents" style="ellipse;whiteSpace=wrap;html=1;fontSize=16;fontStyle=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=4;" parent="1" vertex="1">
+                    <mxGeometry x="910" y="600" width="280" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="collections-title" value="🗄️ Qdrant Collections" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="301" width="200" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="memory-collections-title" value="💾 Enhanced Memory Collections (Content Storage)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="331" width="300" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="global-memory-collection" value="🌍 global_memory&lt;br&gt;&lt;br&gt;EXISTING: content, timestamp, category, importance, agent_id&lt;br&gt;&lt;br&gt;NEW FIELDS:&lt;br&gt;• source_doc_id (UUID, optional)&lt;br&gt;• source_doc_version (int, optional)&lt;br&gt;• chunk_index (int, optional)&lt;br&gt;• is_current (bool, default true)&lt;br&gt;• content_hash (SHA-256, optional)&lt;br&gt;&lt;br&gt;⚡ Content lives here!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="356" width="200" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="learned-memory-collection" value="🎓 learned_memory&lt;br&gt;&lt;br&gt;EXISTING: content, timestamp, category, importance, agent_id&lt;br&gt;&lt;br&gt;NEW FIELDS:&lt;br&gt;• source_doc_id (UUID, optional)&lt;br&gt;• source_doc_version (int, optional)&lt;br&gt;• chunk_index (int, optional)&lt;br&gt;• is_current (bool, default true)&lt;br&gt;• content_hash (SHA-256, optional)&lt;br&gt;&lt;br&gt;⚡ Content lives here!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="356" width="200" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent-memory-collection" value="🤖 agent_memory_*&lt;br&gt;&lt;br&gt;EXISTING: content, timestamp, category, importance, agent_id&lt;br&gt;&lt;br&gt;NEW FIELDS:&lt;br&gt;• source_doc_id (UUID, optional)&lt;br&gt;• source_doc_version (int, optional)&lt;br&gt;• chunk_index (int, optional)&lt;br&gt;• is_current (bool, default true)&lt;br&gt;• content_hash (SHA-256, optional)&lt;br&gt;&lt;br&gt;⚡ Content lives here!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="640" y="356" width="200" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="doc-collections-title" value="📋 Document Metadata Collections (NO CONTENT)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="160" y="585" width="300" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="documents-collection" value="📊 documents (metadata only)&lt;br&gt;&lt;br&gt;• doc_id (UUID, primary)&lt;br&gt;• title, version (monotonic)&lt;br&gt;• memory_type (global/learned/agent_*)&lt;br&gt;• memory_chunk_ids (array references)&lt;br&gt;• content_hash (SHA-256)&lt;br&gt;• tags, aliases&lt;br&gt;• links_out (doc://&lt;id&gt;)&lt;br&gt;• links_dual (GitHub+Local)&lt;br&gt;• created_at, updated_at&lt;br&gt;&lt;br&gt;⚡ NO CONTENT - only references!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="610" width="200" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="doc-versions-collection" value="📚 doc_versions (metadata only)&lt;br&gt;&lt;br&gt;• doc_id, version&lt;br&gt;• memory_chunk_ids (historical refs)&lt;br&gt;• content_hash (SHA-256)&lt;br&gt;• change_note&lt;br&gt;• aliases_snapshot&lt;br&gt;• links_out_snapshot&lt;br&gt;• links_dual_snapshot&lt;br&gt;• created_at&lt;br&gt;&lt;br&gt;⚡ Immutable history&lt;br&gt;⚡ NO CONTENT - only references!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="610" width="200" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="reconstruction-engine" value="🔧 Content Reconstruction Engine&lt;br&gt;&lt;br&gt;async def reconstruct_document_content(&lt;br&gt;    doc_id: str, version: int = None&lt;br&gt;) -&gt; str:&lt;br&gt;    # Get chunk references from documents&lt;br&gt;    doc = await get_document(doc_id)&lt;br&gt;    &lt;br&gt;    # Fetch chunks from memory collections&lt;br&gt;    chunks = await get_memory_chunks(&lt;br&gt;        ids=doc.memory_chunk_ids&lt;br&gt;    )&lt;br&gt;    &lt;br&gt;    # Reconstruct full content&lt;br&gt;    return join_chunks_by_index(chunks)&lt;br&gt;&lt;br&gt;⚡ Builds documents from memory chunks!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=8;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="640" y="610" width="200" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="mcp-server-title" value="🛠️ MCP Server (Cursor Integration)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="89" y="22" width="400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="cursor-agent" value="🤖 Cursor Agent&lt;br&gt;&lt;br&gt;Uses MCP tools to:&lt;br&gt;• Create documents&lt;br&gt;• Update knowledge&lt;br&gt;• Search content (unified)&lt;br&gt;• Navigate links&lt;br&gt;• Import legacy docs" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="70" width="200" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="mcp-create" value="📝 memory.doc.create&lt;br&gt;&lt;br&gt;1. Chunk content&lt;br&gt;2. Store in memory collection&lt;br&gt;3. Create document metadata&lt;br&gt;4. Reconstruct &amp; export .md" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="260" y="80" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="mcp-update" value="🔄 memory.doc.update&lt;br&gt;&lt;br&gt;1. Differential analysis&lt;br&gt;2. Update changed chunks&lt;br&gt;3. Version document metadata&lt;br&gt;4. Reconstruct &amp; export .md" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="260" y="170" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="mcp-search" value="🔍 memory.search (enhanced)&lt;br&gt;&lt;br&gt;Unified search across:&lt;br&gt;• Standalone memory chunks&lt;br&gt;• Document-organized chunks&lt;br&gt;• Includes document context" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="80" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="mcp-get" value="📖 memory.doc.get&lt;br&gt;&lt;br&gt;1. Get document metadata&lt;br&gt;2. Reconstruct from chunks&lt;br&gt;3. Return full markdown&lt;br&gt;4. Include dual-link headers" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="170" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="write-through-title" value="📤 Write-Through Export with Dual Links" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="190" width="400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="local-repo" value="📁 Local Repository&lt;br&gt;&lt;br&gt;/docs/pdca/overview.md&lt;br&gt;/docs/cmmi/template.md&lt;br&gt;/knowledge/index.md&lt;br&gt;&lt;br&gt;Each .md reconstructed from&lt;br&gt;memory chunks with dual-links:&lt;br&gt;[GitHub](url) | [Local](path)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="780" y="110" width="200" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="dual-link-example" value="📄 Content Reconstruction Example&lt;br&gt;&lt;br&gt;[GitHub](https://github.com/org/repo/blob/abc123/docs/pdca/overview.md) | [Local](./docs/pdca/overview.md)&lt;br&gt;&lt;br&gt;# PDCA Overview&lt;br&gt;This document describes the PDCA workflow...&lt;br&gt;&lt;br&gt;⚡ Content reconstructed from memory chunks!&lt;br&gt;⚡ Always dual links in every .md file!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#e6ffcc;strokeColor=#82b366;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1310" y="250" width="420" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="crawler-title" value="🕷️ Crawler (Bootstrap / Legacy Sync)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="920" width="400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="crawler-process" value="🎯 Reference-Based Crawler Process&lt;br&gt;&lt;br&gt;1. Start from README.md (local/GitHub)&lt;br&gt;2. Extract content and chunk semantically&lt;br&gt;3. Store chunks in memory collections&lt;br&gt;4. Create document metadata with chunk refs&lt;br&gt;5. Extract dual-link rows: record aliases&lt;br&gt;6. Resolve links → internal URIs (doc://id)&lt;br&gt;&lt;br&gt;⚡ Content stored in existing memory infrastructure!&lt;br&gt;⚡ Documents provide organization via references!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="990" width="320" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="seed-files" value="🌱 Seed Files&lt;br&gt;&lt;br&gt;• README.md&lt;br&gt;• index.md&lt;br&gt;• Any starting .md&lt;br&gt;&lt;br&gt;Content chunked and&lt;br&gt;stored in memory&lt;br&gt;collections" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="540" y="880" width="140" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="legacy-docs" value="📚 Legacy Docs&lt;br&gt;&lt;br&gt;Existing .md scattered&lt;br&gt;across repo:&lt;br&gt;• components/&lt;br&gt;• docs/&lt;br&gt;• scrum.pmo/&lt;br&gt;• recovery.analysis/&lt;br&gt;&lt;br&gt;Content imported to&lt;br&gt;memory collections" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="540" y="1010" width="140" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="data-flows-title" value="🔄 Reference-Based Data Flows" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1;fontColor=#1f5582;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="950" width="300" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="new-knowledge-flow" value="✨ New Knowledge Flow&lt;br&gt;&lt;br&gt;Agent → memory.doc.create&lt;br&gt;↓&lt;br&gt;Content chunking&lt;br&gt;↓&lt;br&gt;Memory storage (with doc refs)&lt;br&gt;↓&lt;br&gt;Document metadata creation&lt;br&gt;↓&lt;br&gt;Content reconstruction&lt;br&gt;↓&lt;br&gt;Export .md with dual links&lt;br&gt;↓&lt;br&gt;Commit/push → aliases updated" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#e6ffcc;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="1000" width="160" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="update-knowledge-flow" value="🔄 Update Knowledge Flow&lt;br&gt;&lt;br&gt;Agent → memory.doc.update&lt;br&gt;(with prev_version=N)&lt;br&gt;↓&lt;br&gt;Differential chunk analysis&lt;br&gt;↓&lt;br&gt;Update MODIFIED chunks only&lt;br&gt;↓&lt;br&gt;Document version++&lt;br&gt;↓&lt;br&gt;Content reconstruction&lt;br&gt;↓&lt;br&gt;Export updated .md&lt;br&gt;↓&lt;br&gt;Commit/push" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="1270" y="1000" width="160" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="retrieve-knowledge-flow" value="🔍 Enhanced Search Flow&lt;br&gt;&lt;br&gt;Agent → memory.search&lt;br&gt;↓&lt;br&gt;Unified search across:&lt;br&gt;• Standalone memory&lt;br&gt;• Document chunks&lt;br&gt;↓&lt;br&gt;Results with document context&lt;br&gt;&lt;br&gt;Agent → memory.doc.get&lt;br&gt;↓&lt;br&gt;Content reconstruction&lt;br&gt;↓&lt;br&gt;Full markdown with dual-links" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="1440" y="1000" width="160" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="import-legacy-flow" value="🕷️ Import Legacy Flow&lt;br&gt;&lt;br&gt;Agent → memory.import&lt;br&gt;{ seed: README.md }&lt;br&gt;↓&lt;br&gt;Crawler discovers .md files&lt;br&gt;↓&lt;br&gt;Content chunking&lt;br&gt;↓&lt;br&gt;Memory storage with doc refs&lt;br&gt;↓&lt;br&gt;Document metadata creation&lt;br&gt;↓&lt;br&gt;Link resolution&lt;br&gt;&lt;br&gt;⚡ Leverages existing memory!" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="1610" y="1000" width="160" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="guarantees-title" value="⚙️ Reference-Based System Guarantees" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#1f5582;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="390" width="350" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="guarantees-list" value="✅ Memory collections = content source of truth&lt;br&gt;✅ Documents = lightweight metadata organization&lt;br&gt;✅ Content reconstruction from memory chunks&lt;br&gt;✅ .md files = mirrors with dual-link headers&lt;br&gt;✅ Immutable history via chunk references&lt;br&gt;✅ Backward compatibility - existing tools unchanged&lt;br&gt;✅ Unified search (memory + documents)&lt;br&gt;✅ Storage efficiency - no content duplication&lt;br&gt;✅ Differential updates - only changed chunks&lt;br&gt;✅ 80% code reuse from existing infrastructure" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="430" width="400" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="typical-workflow-title" value="🚀 Reference-Based Workflow in Cursor" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="610" width="350" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="workflow-steps" value="1️⃣ Create doc: memory.doc.create&lt;br&gt;   → Content chunked → Memory storage → Document metadata&lt;br&gt;   → Content reconstructed → File exported with dual-links&lt;br&gt;&lt;br&gt;2️⃣ Update doc: memory.doc.update&lt;br&gt;   → Differential analysis → Changed chunks updated&lt;br&gt;   → Content reconstructed → Updated .md committed&lt;br&gt;&lt;br&gt;3️⃣ Search: memory.search (enhanced)&lt;br&gt;   → Unified results from memory + document chunks&lt;br&gt;&lt;br&gt;4️⃣ Import legacy: memory.import&lt;br&gt;   → Content stored in memory → Document refs created" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="1320" y="650" width="400" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-cursor-to-create" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=3;" parent="1" source="cursor-agent" target="mcp-create" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="230" y="120"/>
+                            <mxPoint x="230" y="120"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-cursor-to-search" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=2;" parent="1" source="cursor-agent" target="mcp-search" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="250" y="100"/>
+                            <mxPoint x="250" y="60"/>
+                            <mxPoint x="510" y="60"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-create-to-memory" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;strokeWidth=3;exitX=0.035;exitY=0.981;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="mcp-create" target="global-memory-collection" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="250" y="158"/>
+                            <mxPoint x="250" y="300"/>
+                            <mxPoint x="230" y="300"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-create-to-docs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=3;" parent="1" source="mcp-create" target="documents-collection" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="240" y="140"/>
+                            <mxPoint x="240" y="280"/>
+                            <mxPoint x="60" y="280"/>
+                            <mxPoint x="60" y="710"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-search-to-memory" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;strokeWidth=3;" parent="1" source="mcp-search" target="learned-memory-collection" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="660" y="100"/>
+                            <mxPoint x="660" y="300"/>
+                            <mxPoint x="440" y="300"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-reconstruction" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=3;dashed=1;" parent="1" source="documents-collection" target="reconstruction-engine" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="230" y="604"/>
+                            <mxPoint x="560" y="604"/>
+                            <mxPoint x="560" y="700"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-reconstruction-to-memory" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;strokeWidth=2;dashed=1;startArrow=classic;startFill=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" edge="1" target="agent-memory-collection">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points"/>
+                        <mxPoint x="740.0000000000005" y="610" as="sourcePoint"/>
+                        <mxPoint x="740.0000000000005" y="570" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-crawler-to-qdrant" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=3;dashed=1;exitX=0.994;exitY=0.857;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="crawler-process" target="qdrant-core" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="450" y="1127"/>
+                            <mxPoint x="450" y="1170"/>
+                            <mxPoint x="940" y="1170"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="collections-to-core4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;dashed=1;startArrow=classic;startFill=1;" parent="1" source="documents-collection" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="230" y="840"/>
+                            <mxPoint x="910" y="840"/>
+                            <mxPoint x="910" y="740"/>
+                        </Array>
+                        <mxPoint x="930" y="740" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="collections-to-core5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;strokeWidth=2;dashed=1;entryX=0.013;entryY=0.661;entryDx=0;entryDy=0;entryPerimeter=0;startArrow=classic;startFill=1;" parent="1" source="doc-versions-collection" target="qdrant-core" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="440" y="810"/>
+                            <mxPoint x="870" y="810"/>
+                            <mxPoint x="870" y="740"/>
+                            <mxPoint x="890" y="740"/>
+                            <mxPoint x="890" y="719"/>
+                        </Array>
+                        <mxPoint x="910" y="720" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="export-flow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=4;" parent="1" source="qdrant-core" target="github-repo" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1060" y="500"/>
+                            <mxPoint x="1170" y="500"/>
+                        </Array>
+                        <mxPoint x="1050" y="600" as="sourcePoint"/>
+                        <mxPoint x="1140" y="180" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="github-repo" value="☁️ GitHub Repository&lt;br&gt;&lt;br&gt;github.com/org/repo/blob/&lt;br&gt;• /docs/pdca/overview.md&lt;br&gt;• /docs/cmmi/template.md&lt;br&gt;• /knowledge/index.md&lt;br&gt;&lt;br&gt;Content reconstructed from&lt;br&gt;memory chunks with dual-links" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="1070" y="110" width="200" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="export-flow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=4;entryX=0.458;entryY=0.991;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" target="local-repo" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1020" y="500"/>
+                            <mxPoint x="872" y="500"/>
+                        </Array>
+                        <mxPoint x="1020" y="601" as="sourcePoint"/>
+                        <mxPoint x="1130" y="251" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="architecture-summary" value="🎯 Reference-Based Architecture Summary&lt;br&gt;&lt;br&gt;• Memory Collections = Content storage (global, learned, agent_*)&lt;br&gt;• Document Collections = Lightweight metadata with chunk references&lt;br&gt;• Content Reconstruction = On-demand assembly from memory chunks&lt;br&gt;• MCP Server = Enhanced interface (backward compatible tools)&lt;br&gt;• Write-through export = .md mirrors reconstructed with dual links&lt;br&gt;• Unified search = Memory + documents via existing infrastructure&lt;br&gt;• 80% code reuse = Leverage existing memory management&lt;br&gt;• Zero breaking changes = Existing memory tools work unchanged" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#f0f8ff;strokeColor=#1f5582;strokeWidth=3;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="1220" width="520" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-legend" value="🎨 Reference-Based Flow Legend&lt;br&gt;&lt;br&gt;🔴 Cursor → MCP tools&lt;br&gt;🟢 Content → Memory collections (chunks)&lt;br&gt;🟣 Metadata → Document collections (refs)&lt;br&gt;🔵 Content reconstruction (dashed)&lt;br&gt;🟡 Qdrant → Export (write-through)&lt;br&gt;🟠 Local → GitHub sync&lt;br&gt;🟤 Crawler import (dashed)&lt;br&gt;⚫ Collection membership (dashed)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="1280" y="1220" width="260" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="section-crawler" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=1 4;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="870" width="640" height="310" as="geometry"/>
+                </mxCell>
+                <mxCell id="section-flows" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=1 4;" parent="1" vertex="1">
+                    <mxGeometry x="1080" y="940" width="710" height="265" as="geometry"/>
+                </mxCell>
+                <mxCell id="section-export" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;dashed=1;dashPattern=1 4;" parent="1" vertex="1">
+                    <mxGeometry x="1290" y="170" width="470" height="720" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="" style="endArrow=classic;html=1;exitX=0.977;exitY=0.934;exitDx=0;exitDy=0;exitPerimeter=0;strokeWidth=2;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;startArrow=classic;startFill=1;" parent="1" source="agent-memory-collection" target="qdrant-core" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="900" y="570" as="sourcePoint"/>
+                        <mxPoint x="950" y="520" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="3" value="" style="endArrow=classic;html=1;exitX=0.977;exitY=0.934;exitDx=0;exitDy=0;exitPerimeter=0;strokeWidth=2;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;entryX=0.096;entryY=0.164;entryDx=0;entryDy=0;entryPerimeter=0;startArrow=classic;startFill=1;" parent="1" target="qdrant-core" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="530" y="527.5" as="sourcePoint"/>
+                        <mxPoint x="655" y="624.5" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="620" y="550"/>
+                            <mxPoint x="830" y="550"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="4" value="" style="endArrow=classic;html=1;exitX=0.977;exitY=0.934;exitDx=0;exitDy=0;exitPerimeter=0;strokeWidth=2;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;entryX=0.044;entryY=0.256;entryDx=0;entryDy=0;entryPerimeter=0;startArrow=classic;startFill=1;" parent="1" target="qdrant-core" edge="1">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="310" y="536" as="sourcePoint"/>
+                        <mxPoint x="717" y="638.5" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="310" y="570"/>
+                            <mxPoint x="820" y="570"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="7" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.597;entryDx=0;entryDy=0;entryPerimeter=0;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=3;" edge="1" parent="1" source="mcp-update" target="doc-versions-collection">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="340" y="350" as="sourcePoint"/>
+                        <mxPoint x="390" y="300" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="340" y="320"/>
+                            <mxPoint x="590" y="320"/>
+                            <mxPoint x="580" y="683"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="8" value="" style="endArrow=classic;html=1;exitX=0.91;exitY=1.016;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.692;entryY=1.028;entryDx=0;entryDy=0;entryPerimeter=0;dashed=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=3;" edge="1" parent="1" source="mcp-get" target="documents-collection">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="410" y="500" as="sourcePoint"/>
+                        <mxPoint x="460" y="450" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="576" y="500"/>
+                            <mxPoint x="570" y="830"/>
+                            <mxPoint x="270" y="830"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="9" value="" style="endArrow=classic;html=1;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.017;entryY=0.057;entryDx=0;entryDy=0;entryPerimeter=0;strokeWidth=3;dashed=1;fillColor=#d5e8d4;strokeColor=#82b366;" edge="1" parent="1" source="mcp-get" target="reconstruction-engine">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="410" y="600" as="sourcePoint"/>
+                        <mxPoint x="460" y="550" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="600" y="330"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="10" value="" style="endArrow=classic;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=-0.011;entryY=0.329;entryDx=0;entryDy=0;entryPerimeter=0;strokeWidth=3;fillColor=#d5e8d4;strokeColor=#82b366;" edge="1" parent="1" source="mcp-search" target="documents-collection">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="480" y="520" as="sourcePoint"/>
+                        <mxPoint x="530" y="470" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="630" y="120"/>
+                            <mxPoint x="630" y="210"/>
+                            <mxPoint x="630" y="290"/>
+                            <mxPoint x="90" y="290"/>
+                            <mxPoint x="90" y="670"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="11" value="" style="endArrow=classic;html=1;exitX=0.418;exitY=0.984;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.147;entryY=-0.023;entryDx=0;entryDy=0;entryPerimeter=0;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;strokeWidth=3;" edge="1" parent="1" source="global-memory-collection" target="reconstruction-engine">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="300" y="600" as="sourcePoint"/>
+                        <mxPoint x="350" y="550" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="214" y="580"/>
+                            <mxPoint x="670" y="580"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="12" value="" style="endArrow=classic;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.355;entryY=-0.018;entryDx=0;entryDy=0;entryPerimeter=0;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=3;dashed=1;" edge="1" parent="1" source="learned-memory-collection" target="reconstruction-engine">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="300" y="600" as="sourcePoint"/>
+                        <mxPoint x="350" y="550" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="440" y="560"/>
+                            <mxPoint x="711" y="560"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
